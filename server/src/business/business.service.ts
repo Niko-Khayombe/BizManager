@@ -160,6 +160,42 @@ async findMyBusinesses(userId: string) {
   }));
 }
 
+async findMembers(businessId: string) {
+  const memberships = await this.prisma.businessMembership.findMany({
+    where: {
+      businessId,
+    },
+    select: {
+      id: true,
+      createdAt: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      role: {
+        select: {
+          id: true,
+          name: true,
+          key: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  });
+
+  return memberships.map((membership) => ({
+    membershipId: membership.id,
+    joinedAt: membership.createdAt,
+    user: membership.user,
+    role: membership.role,
+  }));
+}
+
 async findOne(businessId: string) {
   const business = await this.prisma.business.findUnique({
     where: {

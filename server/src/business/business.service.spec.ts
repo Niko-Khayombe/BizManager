@@ -14,6 +14,91 @@ import {
 describe('BusinessService', () => {
   let service: BusinessService;
 
+  describe('findMembers', () => {
+  it('should return members belonging to the specified business', async () => {
+    const joinedAt = new Date('2026-11-26T10:00:00.000Z');
+
+    const fakeMemberships = [
+      {
+        id: 'membership-123',
+        createdAt: joinedAt,
+        user: {
+          id: 'user-123',
+          name: 'John Doe',
+          email: 'john@example.com',
+        },
+        role: {
+          id: 'role-123',
+          name: 'Sales',
+          key: 'SALES',
+        },
+      },
+    ];
+
+    mockPrisma.businessMembership.findMany.mockResolvedValue(
+      fakeMemberships,
+    );
+
+    const result = await service.findMembers('business-123');
+
+    expect(
+      mockPrisma.businessMembership.findMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        businessId: 'business-123',
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            key: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    expect(result).toEqual([
+      {
+        membershipId: 'membership-123',
+        joinedAt,
+        user: {
+          id: 'user-123',
+          name: 'John Doe',
+          email: 'john@example.com',
+        },
+        role: {
+          id: 'role-123',
+          name: 'Sales',
+          key: 'SALES',
+        },
+      },
+    ]);
+
+    expect(result[0]).not.toHaveProperty('user.passwordHash');
+  });
+
+  it('should return an empty array when the business has no members', async () => {
+    mockPrisma.businessMembership.findMany.mockResolvedValue([]);
+
+    const result = await service.findMembers('business-123');
+
+    expect(result).toEqual([]);
+  });
+});
+
   const mockPrisma = {
     $transaction: vi.fn(),
     businessMembership: {

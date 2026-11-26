@@ -1,5 +1,3 @@
-import { PermissionsGuard } from './permissions/permissions.guard.js';
-import { RequirePermissions } from './permissions/permissions.decorator.js';
 import {
   Body,
   Controller,
@@ -14,6 +12,8 @@ import { BusinessService } from './business.service.js';
 import { CreateBusinessDto } from './dto/create-business.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { BusinessMembershipGuard } from './guards/business-membership.guard.js';
+import { PermissionsGuard } from './permissions/permissions.guard.js';
+import { RequirePermissions } from './permissions/permissions.decorator.js';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -41,19 +41,27 @@ export class BusinessController {
   }
 
   @Get()
-findMyBusinesses(@Req() request: AuthenticatedRequest) {
-  return this.businessService.findMyBusinesses(
-    request.user.userId,
-  );
-}
+  findMyBusinesses(@Req() request: AuthenticatedRequest) {
+    return this.businessService.findMyBusinesses(
+      request.user.userId,
+    );
+  }
 
-@Get(':businessId')
-@UseGuards(BusinessMembershipGuard, PermissionsGuard)
-@RequirePermissions('business.read')
-getBusiness(
-  @Param('businessId') businessId: string,
-) {
-  return this.businessService.findOne(businessId);
-}
+  @Get(':businessId/members')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('users.read')
+  findMembers(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findMembers(businessId);
+  }
 
+  @Get(':businessId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('business.read')
+  getBusiness(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findOne(businessId);
+  }
 }
