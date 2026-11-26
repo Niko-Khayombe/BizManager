@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateBusinessDto } from './dto/create-business.dto.js';
+import {
+  SYSTEM_PERMISSIONS,
+  ROLE_PERMISSION_KEYS,
+} from './permissions/permissions.constants.js';
 
 @Injectable()
 export class BusinessService {
@@ -58,6 +62,49 @@ export class BusinessService {
           }),
         ),
       );
+
+// Register all system permissions.
+await tx.permission.createMany({
+  data: [...SYSTEM_PERMISSIONS],
+  skipDuplicates: true,
+});
+
+// Retrieve the permission records.
+const permissions = await tx.permission.findMany({
+  where: {
+    key: {
+      in: SYSTEM_PERMISSIONS.map((permission) => permission.key),
+    },
+  },
+  select: {
+    id: true,
+    key: true,
+  },
+});
+
+// Assign permissions to each role.
+await Promise.all(
+  roles.map((role) => {
+    const allowedKeys = new Set<string>(
+      ROLE_PERMISSION_KEYS[
+        role.key as keyof typeof ROLE_PERMISSION_KEYS
+      ],
+    );
+
+    const assignments = permissions
+      .filter((permission) => allowedKeys.has(permission.key))
+      .map((permission) => ({
+        businessId: business.id,
+        roleId: role.id,
+        permissionId: permission.id,
+      }));
+
+    return tx.rolePermission.createMany({
+      data: assignments,
+      skipDuplicates: true,
+    });
+  }),
+);
 
       const ownerRole = roles.find((role) => role.key === 'OWNER');
 

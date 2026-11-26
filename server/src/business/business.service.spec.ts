@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { BusinessService } from './business.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  SYSTEM_PERMISSIONS,
+  ROLE_PERMISSION_KEYS,
+} from './permissions/permissions.constants.js';
 
 describe('BusinessService', () => {
   let service: BusinessService;
@@ -85,6 +89,18 @@ describe('BusinessService', () => {
               }),
             ),
         },
+permission: {
+  createMany: vi.fn().mockResolvedValue({ count: SYSTEM_PERMISSIONS.length }),
+  findMany: vi.fn().mockResolvedValue(
+    SYSTEM_PERMISSIONS.map((permission, index) => ({
+      id: `permission-${index + 1}`,
+      key: permission.key,
+    })),
+  ),
+},
+rolePermission: {
+  createMany: vi.fn().mockResolvedValue({ count: 10 }),
+},
         businessMembership: {
           create: vi.fn().mockResolvedValue({
             userId: 'user-123',
@@ -103,6 +119,34 @@ describe('BusinessService', () => {
 
       expect(tx.business.create).toHaveBeenCalled();
       expect(tx.role.create).toHaveBeenCalledTimes(6);
+// Verify that the system permission catalogue was registered.
+expect(tx.permission.createMany).toHaveBeenCalledWith({
+  data: [...SYSTEM_PERMISSIONS],
+  skipDuplicates: true,
+});
+
+// Verify that permission records were retrieved.
+expect(tx.permission.findMany).toHaveBeenCalled();
+
+// Verify that all six roles received permission assignments.
+expect(tx.rolePermission.createMany).toHaveBeenCalledTimes(6);
+
+const assignments =
+  tx.rolePermission.createMany.mock.calls.map(
+    ([argument]) => argument.data,
+  );
+
+for (const role of fakeRoles) {
+  const roleAssignments = assignments.flat().filter(
+    (assignment) => assignment.roleId === role.id,
+  );
+
+  expect(roleAssignments).toHaveLength(
+    ROLE_PERMISSION_KEYS[
+      role.key as keyof typeof ROLE_PERMISSION_KEYS
+    ].length,
+  );
+}
       expect(tx.businessMembership.create).toHaveBeenCalledWith({
         data: {
           businessId: 'business-123',

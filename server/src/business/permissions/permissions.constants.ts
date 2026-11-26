@@ -1,0 +1,112 @@
+
+export const SYSTEM_PERMISSIONS = [
+  { key: 'business.read', name: 'View business' },
+  { key: 'business.update', name: 'Update business' },
+
+  { key: 'users.read', name: 'View users' },
+  { key: 'users.manage', name: 'Manage users' },
+
+  { key: 'roles.read', name: 'View roles' },
+  { key: 'roles.manage', name: 'Manage roles' },
+
+  { key: 'customers.create', name: 'Create customers' },
+  { key: 'customers.read', name: 'View customers' },
+  { key: 'customers.update', name: 'Update customers' },
+  { key: 'customers.delete', name: 'Delete customers' },
+
+  { key: 'products.create', name: 'Create products' },
+  { key: 'products.read', name: 'View products' },
+  { key: 'products.update', name: 'Update products' },
+  { key: 'products.delete', name: 'Delete products' },
+
+  { key: 'inventory.read', name: 'View inventory' },
+  { key: 'inventory.adjust', name: 'Adjust inventory' },
+
+  { key: 'sales.create', name: 'Create sales' },
+  { key: 'sales.read', name: 'View sales' },
+  { key: 'sales.update', name: 'Update sales' },
+  { key: 'sales.cancel', name: 'Cancel sales' },
+
+  { key: 'payments.create', name: 'Record payments' },
+  { key: 'payments.read', name: 'View payments' },
+  { key: 'payments.refund', name: 'Refund payments' },
+
+  { key: 'expenses.create', name: 'Create expenses' },
+  { key: 'expenses.read', name: 'View expenses' },
+  { key: 'expenses.update', name: 'Update expenses' },
+  { key: 'expenses.delete', name: 'Delete expenses' },
+
+  { key: 'reports.read', name: 'View reports' },
+] as const;
+
+const ALL_PERMISSION_KEYS = SYSTEM_PERMISSIONS.map(
+  (permission) => permission.key,
+);
+
+export const ROLE_PERMISSION_KEYS = {
+  OWNER: [...ALL_PERMISSION_KEYS],
+
+  ADMIN: ALL_PERMISSION_KEYS.filter(
+    (key) => key !== 'users.manage' && key !== 'roles.manage',
+  ),
+
+  MANAGER: [
+    'business.read',
+    'users.read',
+    'customers.create',
+    'customers.read',
+    'customers.update',
+    'customers.delete',
+    'products.read',
+    'products.update',
+    'inventory.read',
+    'inventory.adjust',
+    'sales.create',
+    'sales.read',
+    'sales.update',
+    'sales.cancel',
+    'payments.create',
+    'payments.read',
+    'expenses.create',
+    'expenses.read',
+    'expenses.update',
+    'reports.read',
+  ],
+
+  SALES: [
+    'customers.create',
+    'customers.read',
+    'customers.update',
+    'products.read',
+    'inventory.read',
+    'sales.create',
+    'sales.read',
+    'sales.update',
+    'payments.create',
+    'payments.read',
+  ],
+
+  STOCK_MANAGER: [
+    'products.create',
+    'products.read',
+    'products.update',
+    'inventory.read',
+    'inventory.adjust',
+    'sales.read',
+  ],
+
+  ACCOUNTANT: [
+    'business.read',
+    'customers.read',
+    'products.read',
+    'inventory.read',
+    'sales.read',
+    'payments.read',
+    'payments.refund',
+    'expenses.create',
+    'expenses.read',
+    'expenses.update',
+    'expenses.delete',
+    'reports.read',
+  ],
+} as const;

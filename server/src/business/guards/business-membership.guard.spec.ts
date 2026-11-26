@@ -18,7 +18,23 @@ describe('BusinessMembershipGuard', () => {
     },
   };
 
-  const mockRequest = {
+  const mockRequest: {
+    user?: {
+      userId: string;
+      email: string;
+    };
+    params: {
+      businessId?: string;
+    };
+    businessMembership?: {
+      id: string;
+      role: {
+        id: string;
+        key: string;
+        name: string;
+      };
+    };
+  } = {
     user: {
       userId: 'user-123',
       email: 'owner@example.com',
@@ -46,6 +62,8 @@ describe('BusinessMembershipGuard', () => {
       businessId: 'business-123',
     };
 
+    mockRequest.businessMembership = undefined;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BusinessMembershipGuard,
@@ -69,6 +87,7 @@ describe('BusinessMembershipGuard', () => {
     mockPrisma.businessMembership.findUnique.mockResolvedValue({
       id: 'membership-123',
       role: {
+        id: 'role-123',
         key: 'OWNER',
         name: 'Owner',
       },
@@ -91,6 +110,7 @@ describe('BusinessMembershipGuard', () => {
         id: true,
         role: {
           select: {
+            id: true,
             key: true,
             name: true,
           },
@@ -98,16 +118,14 @@ describe('BusinessMembershipGuard', () => {
       },
     });
 
-    expect(mockRequest).toHaveProperty(
-      'businessMembership',
-      {
-        id: 'membership-123',
-        role: {
-          key: 'OWNER',
-          name: 'Owner',
-        },
+    expect(mockRequest).toHaveProperty('businessMembership', {
+      id: 'membership-123',
+      role: {
+        id: 'role-123',
+        key: 'OWNER',
+        name: 'Owner',
       },
-    );
+    });
   });
 
   it('should reject a user who is not a member', async () => {

@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 interface BusinessMembershipContext {
   id: string;
   role: {
+    id: string;
     key: string;
     name: string;
   };
@@ -55,14 +56,15 @@ export class BusinessMembershipGuard implements CanActivate {
         },
       },
       select: {
-        id: true,
-        role: {
-          select: {
-            key: true,
-            name: true,
-          },
-        },
-      },
+  id: true,
+  role: {
+    select: {
+      id: true,
+      key: true,
+      name: true,
+    },
+  },
+},
     });
 
     if (!membership) {

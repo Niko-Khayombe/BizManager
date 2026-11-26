@@ -1,4 +1,5 @@
-
+import { PermissionsGuard } from './permissions/permissions.guard.js';
+import { RequirePermissions } from './permissions/permissions.decorator.js';
 import {
   Body,
   Controller,
@@ -47,7 +48,8 @@ findMyBusinesses(@Req() request: AuthenticatedRequest) {
 }
 
 @Get(':businessId')
-@UseGuards(BusinessMembershipGuard)
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('business.read')
 getBusiness(
   @Param('businessId') businessId: string,
 ) {
