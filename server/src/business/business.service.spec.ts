@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { BusinessService } from './business.service.js';
@@ -263,6 +264,175 @@ for (const role of fakeRoles) {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('addMember', () => {
+  const createTransaction = () => ({
+    user: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: 'user-456',
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+      }),
+    },
+    role: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'role-sales',
+        name: 'Sales',
+        key: 'SALES',
+      }),
+    },
+    businessMembership: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        id: 'membership-456',
+        createdAt: new Date('2026-11-26T10:00:00.000Z'),
+        user: {
+          id: 'user-456',
+          name: 'Jane Doe',
+          email: 'jane@example.com',
+        },
+        role: {
+          id: 'role-sales',
+          name: 'Sales',
+          key: 'SALES',
+        },
+      }),
+    },
+  });
+
+  it('should add an existing user to the business', async () => {
+    const tx = createTransaction();
+
+    mockPrisma.$transaction.mockImplementation(
+      (callback) => callback(tx),
+    );
+
+    const result = await service.addMember('business-123', {
+      email: ' JANE@example.com ',
+      roleId: 'role-sales',
+    });
+
+    expect(tx.user.findUnique).toHaveBeenCalledWith({
+      where: { email: 'jane@example.com' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    expect(tx.role.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'role-sales',
+        businessId: 'business-123',
+      },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+      },
+    });
+
+    expect(tx.businessMembership.create).toHaveBeenCalledWith({
+      data: {
+        businessId: 'business-123',
+        userId: 'user-456',
+        roleId: 'role-sales',
+      },
+      select: expect.any(Object),
+    });
+
+    expect(result.membership.user).toEqual({
+      id: 'user-456',
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+    });
+
+    expect(result.membership.user).not.toHaveProperty(
+      'passwordHash',
+    );
+  });
+
+  it('should reject an email that is not registered', async () => {
+    const tx = createTransaction();
+    tx.user.findUnique.mockResolvedValue(null);
+
+    mockPrisma.$transaction.mockImplementation(
+      (callback) => callback(tx),
+    );
+
+    await expect(
+      service.addMember('business-123', {
+        email: 'missing@example.com',
+        roleId: 'role-sales',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(tx.role.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('should reject a role that does not belong to the business', async () => {
+    const tx = createTransaction();
+    tx.role.findFirst.mockResolvedValue(null);
+
+    mockPrisma.$transaction.mockImplementation(
+      (callback) => callback(tx),
+    );
+
+    await expect(
+      service.addMember('business-123', {
+        email: 'jane@example.com',
+        roleId: 'foreign-role',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(tx.businessMembership.create).not.toHaveBeenCalled();
+  });
+
+  it('should reject assignment of the Owner role', async () => {
+    const tx = createTransaction();
+
+    tx.role.findFirst.mockResolvedValue({
+      id: 'role-owner',
+      name: 'Owner',
+      key: 'OWNER',
+    });
+
+    mockPrisma.$transaction.mockImplementation(
+      (callback) => callback(tx),
+    );
+
+    await expect(
+      service.addMember('business-123', {
+        email: 'jane@example.com',
+        roleId: 'role-owner',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.businessMembership.create).not.toHaveBeenCalled();
+  });
+
+  it('should reject a user who is already a member', async () => {
+    const tx = createTransaction();
+
+    tx.businessMembership.findUnique.mockResolvedValue({
+      id: 'existing-membership',
+    });
+
+    mockPrisma.$transaction.mockImplementation(
+      (callback) => callback(tx),
+    );
+
+    await expect(
+      service.addMember('business-123', {
+        email: 'jane@example.com',
+        roleId: 'role-sales',
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(tx.businessMembership.create).not.toHaveBeenCalled();
+  });
+});
 
   describe('findMyBusinesses', () => {
     it('should return only the memberships belonging to the user', async () => {

@@ -1,11 +1,13 @@
 
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateBusinessDto } from './dto/create-business.dto.js';
+import { AddBusinessMemberDto } from './dto/add-business-member.dto.js';
 import {
   SYSTEM_PERMISSIONS,
   ROLE_PERMISSION_KEYS,
@@ -194,6 +196,109 @@ async findMembers(businessId: string) {
     user: membership.user,
     role: membership.role,
   }));
+}
+
+async addMember(
+  businessId: string,
+  dto: AddBusinessMemberDto,
+) {
+  const email = dto.email.trim().toLowerCase();
+
+  return this.prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        'No registered user found with this email.',
+      );
+    }
+
+    const role = await tx.role.findFirst({
+      where: {
+        id: dto.roleId,
+        businessId,
+      },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(
+        'Role not found in this business.',
+      );
+    }
+
+    if (role.key === 'OWNER') {
+      throw new BadRequestException(
+        'The Owner role cannot be assigned through this operation.',
+      );
+    }
+
+    const existingMembership =
+      await tx.businessMembership.findUnique({
+        where: {
+          businessId_userId: {
+            businessId,
+            userId: user.id,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (existingMembership) {
+      throw new ConflictException(
+        'This user is already a member of the business.',
+      );
+    }
+
+    const membership = await tx.businessMembership.create({
+      data: {
+        businessId,
+        userId: user.id,
+        roleId: role.id,
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            key: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'Team member added successfully.',
+      membership: {
+        membershipId: membership.id,
+        joinedAt: membership.createdAt,
+        user: membership.user,
+        role: membership.role,
+      },
+    };
+  });
 }
 
 async findOne(businessId: string) {

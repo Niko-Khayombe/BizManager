@@ -14,6 +14,7 @@ describe('BusinessController', () => {
 
   const mockBusinessService = {
     findMembers: vi.fn(),
+    addMember: vi.fn(),
     findMyBusinesses: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
@@ -60,6 +61,55 @@ describe('BusinessController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+    describe('addMember', () => {
+    it('should add a member to the specified business', async () => {
+      const dto = {
+        email: 'jane@example.com',
+        roleId: 'role-sales',
+      };
+
+      const fakeResult = {
+        message: 'Team member added successfully.',
+        membership: {
+          membershipId: 'membership-456',
+          user: {
+            id: 'user-456',
+            name: 'Jane Doe',
+            email: 'jane@example.com',
+          },
+          role: {
+            id: 'role-sales',
+            name: 'Sales',
+            key: 'SALES',
+          },
+        },
+      };
+
+      mockBusinessService.addMember.mockResolvedValue(fakeResult);
+
+      const result = await controller.addMember(
+        'business-123',
+        dto,
+      );
+
+      expect(mockBusinessService.addMember).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the users.manage permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.addMember,
+      );
+
+      expect(requiredPermissions).toEqual(['users.manage']);
+    });
   });
 
   describe('findMembers', () => {
