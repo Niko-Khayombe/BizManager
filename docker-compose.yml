@@ -1,0 +1,26 @@
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: bizmanager-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: bizmanager
+      POSTGRES_PASSWORD: bizmanager_dev_password
+      POSTGRES_DB: bizmanager
+
+    ports:
+      - "127.0.0.1:5434:5432"
+
+    volumes:
+      - bizmanager_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bizmanager -d bizmanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bizmanager_data:

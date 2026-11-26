@@ -1,0 +1,74 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  currency  String   @default("KES") @db.VarChar(3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles       Role[]
+  memberships BusinessMembership[]
+
+  @@map("businesses")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships BusinessMembership[]
+
+  @@map("users")
+}
+
+model Role {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  key        String
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business    Business             @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  memberships BusinessMembership[]
+
+  @@unique([businessId, key])
+  @@unique([businessId, id])
+  @@map("roles")
+}
+
+model BusinessMembership {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String
+  roleId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role     @relation(fields: [businessId, roleId], references: [businessId, id], onDelete: Restrict)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@index([businessId, roleId])
+  @@map("business_memberships")
+}
+
