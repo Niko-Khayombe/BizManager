@@ -1,3 +1,4 @@
+import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
 import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
   Body,
@@ -95,6 +96,19 @@ export class BusinessController {
     @Param('businessId') businessId: string,
   ) {
     return this.businessService.findRoles(businessId);
+  }
+
+  @Post(':businessId/roles')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('roles.manage')
+  createRole(
+    @Param('businessId') businessId: string,
+    @Body() dto: CreateBusinessRoleDto,
+  ) {
+    return this.businessService.createRole(
+      businessId,
+      dto,
+    );
   }
 
   @Delete(':businessId/members/:membershipId')

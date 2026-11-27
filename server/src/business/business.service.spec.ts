@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
@@ -818,6 +819,144 @@ for (const role of fakeRoles) {
       await expect(
         service.findOne('missing-business'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+    describe('createRole', () => {
+         it('should reject duplicate role names', async () => {
+      const tx = createTransaction();
+
+      tx.role.findFirst.mockResolvedValue({
+        id: 'existing-role',
+      });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.createRole('business-123', {
+          name: 'Supervisor',
+          permissions: ['sales.read'],
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(tx.role.create).not.toHaveBeenCalled();
+    });
+    const createTransaction = () => ({
+      role: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'role-supervisor',
+          name: 'Supervisor',
+          key: 'SUPERVISOR',
+          isSystem: false,
+        }),
+      },
+      permission: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'permission-1', key: 'sales.read' },
+          { id: 'permission-2', key: 'sales.create' },
+        ]),
+      },
+      rolePermission: {
+        createMany: vi.fn().mockResolvedValue({ count: 2 }),
+      },
+    });
+
+    it('should create a custom role and assign permissions', async () => {
+      const tx = createTransaction();
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.createRole(
+        'business-123',
+        {
+          name: 'Supervisor',
+          permissions: ['sales.read', 'sales.create'],
+        },
+      );
+
+      expect(tx.role.create).toHaveBeenCalledWith({
+        data: {
+          businessId: 'business-123',
+          name: 'Supervisor',
+          key: 'SUPERVISOR',
+          isSystem: false,
+        },
+        select: {
+          id: true,
+          name: true,
+          key: true,
+          isSystem: true,
+        },
+      });
+
+      expect(tx.rolePermission.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            businessId: 'business-123',
+            roleId: 'role-supervisor',
+            permissionId: 'permission-1',
+          },
+          {
+            businessId: 'business-123',
+            roleId: 'role-supervisor',
+            permissionId: 'permission-2',
+          },
+        ],
+      });
+
+      expect(result.role.isSystem).toBe(false);
+      expect(result.permissions).toEqual([
+        'sales.read',
+        'sales.create',
+      ]);
+    });
+
+    it('should reject invalid permission keys', async () => {
+      await expect(
+        service.createRole('business-123', {
+          name: 'Supervisor',
+          permissions: ['invalid.permission'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject reserved system role names', async () => {
+      await expect(
+        service.createRole('business-123', {
+          name: 'Owner',
+          permissions: ['sales.read'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+        it('should convert Prisma duplicate errors into ConflictException', async () => {
+      const prismaError =
+        new Prisma.PrismaClientKnownRequestError(
+          'Unique constraint failed',
+          {
+            code: 'P2002',
+            clientVersion: '6.19.3',
+            meta: {
+              target: ['businessId', 'key'],
+            },
+          },
+        );
+
+      mockPrisma.$transaction.mockRejectedValue(prismaError);
+
+      await expect(
+        service.createRole('business-123', {
+          name: 'Supervisor',
+          permissions: ['sales.read'],
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

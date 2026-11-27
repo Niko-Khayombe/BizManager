@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
 import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
   BadRequestException,
@@ -213,6 +215,134 @@ async findRoles(businessId: string) {
     },
   });
 }
+
+async createRole(
+  businessId: string,
+  dto: CreateBusinessRoleDto,
+) {
+  const name = dto.name.trim();
+
+  if (!name) {
+    throw new BadRequestException(
+      'Role name cannot be empty.',
+    );
+  }
+
+  const key = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!key || key.length > 50) {
+    throw new BadRequestException(
+      'Invalid role name.',
+    );
+  }
+
+  const reservedKeys = Object.keys(ROLE_PERMISSION_KEYS);
+
+  if (reservedKeys.includes(key)) {
+    throw new BadRequestException(
+      'This role name is reserved for a system role.',
+    );
+  }
+
+  const validPermissionKeys = new Set(
+    SYSTEM_PERMISSIONS.map((permission) => permission.key),
+  );
+
+  const invalidPermissions = dto.permissions.filter(
+    (permission) => !validPermissionKeys.has(
+      permission as (typeof SYSTEM_PERMISSIONS)[number]['key'],
+    ),
+  );
+
+  if (invalidPermissions.length > 0) {
+    throw new BadRequestException(
+      `Invalid permissions: ${invalidPermissions.join(', ')}`,
+    );
+  }
+
+    try {
+    return await this.prisma.$transaction(async (tx) => {
+    const existingRole = await tx.role.findFirst({
+      where: {
+        businessId,
+        OR: [
+          { key },
+          { name: { equals: name, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (existingRole) {
+      throw new ConflictException(
+        'A role with this name already exists.',
+      );
+    }
+
+    const permissions = await tx.permission.findMany({
+      where: {
+        key: { in: dto.permissions },
+      },
+      select: {
+        id: true,
+        key: true,
+      },
+    });
+
+    if (permissions.length !== dto.permissions.length) {
+      throw new BadRequestException(
+        'One or more permissions are not registered.',
+      );
+    }
+
+    const role = await tx.role.create({
+      data: {
+        businessId,
+        name,
+        key,
+        isSystem: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+        isSystem: true,
+      },
+    });
+
+    if (permissions.length > 0) {
+      await tx.rolePermission.createMany({
+        data: permissions.map((permission) => ({
+          businessId,
+          roleId: role.id,
+          permissionId: permission.id,
+        })),
+      });
+    }
+
+    return {
+      message: 'Custom role created successfully.',
+      role,
+      permissions: permissions.map((permission) => permission.key),
+    };
+      });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A role with this name already exists.',
+      );
+    }
+
+    throw error;
+  }
+}
+
 
 async addMember(
   businessId: string,

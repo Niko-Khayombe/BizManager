@@ -15,6 +15,7 @@ describe('BusinessController', () => {
   const mockBusinessService = {
     findMembers: vi.fn(),
     addMember: vi.fn(),
+    createRole: vi.fn(),
     updateMemberRole: vi.fn(),
     findRoles: vi.fn(),
     findMyBusinesses: vi.fn(),
@@ -271,4 +272,46 @@ describe('BusinessController', () => {
     });
   });
 
+    describe('createRole', () => {
+    it('should create a custom role for the specified business', async () => {
+      const dto = {
+        name: 'Supervisor',
+        permissions: ['sales.read', 'sales.create'],
+      };
+
+      const fakeResult = {
+        message: 'Custom role created successfully.',
+        role: {
+          id: 'role-supervisor',
+          name: 'Supervisor',
+          key: 'SUPERVISOR',
+          isSystem: false,
+        },
+        permissions: ['sales.read', 'sales.create'],
+      };
+
+      mockBusinessService.createRole.mockResolvedValue(fakeResult);
+
+      const result = await controller.createRole(
+        'business-123',
+        dto,
+      );
+
+      expect(mockBusinessService.createRole).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the roles.manage permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.createRole,
+      );
+
+      expect(requiredPermissions).toEqual(['roles.manage']);
+    });
+  });
 });
