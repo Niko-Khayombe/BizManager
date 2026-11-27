@@ -20,6 +20,7 @@ model Business {
 
   roles       Role[]
   memberships BusinessMembership[]
+  customers Customer[]
 
   @@map("businesses")
 }
@@ -97,4 +98,21 @@ model RolePermission {
   @@id([businessId, roleId, permissionId])
   @@index([permissionId])
   @@map("role_permissions")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  businessId String
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+
+  @@index([businessId])
+  @@index([businessId, name])
+  @@map("customers")
 }

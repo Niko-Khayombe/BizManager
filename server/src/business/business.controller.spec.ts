@@ -1,3 +1,4 @@
+
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
@@ -15,6 +16,10 @@ describe('BusinessController', () => {
   const mockBusinessService = {
     findMembers: vi.fn(),
     addMember: vi.fn(),
+    createCustomer: vi.fn(),
+    findCustomers: vi.fn(),
+    findCustomer: vi.fn(),
+    updateCustomer: vi.fn(),
     createRole: vi.fn(),
     updateMemberRole: vi.fn(),
     findRoles: vi.fn(),
@@ -39,24 +44,24 @@ describe('BusinessController', () => {
           useValue: { canActivate: () => true },
         },
         {
-    provide: BusinessMembershipGuard,
-    useValue: { canActivate: vi.fn().mockReturnValue(true) },
-  },
+          provide: BusinessMembershipGuard,
+          useValue: { canActivate: vi.fn().mockReturnValue(true) },
+        },
         {
           provide: PermissionsGuard,
           useValue: { canActivate: () => true },
         },
-  {
-    provide: PrismaService,
-    useValue: {
-         businessMembership: {
-           findUnique: vi.fn(),
-       },
-        rolePermission: {
-             findMany: vi.fn(),
-         },
-      },
-     },
+        {
+          provide: PrismaService,
+          useValue: {
+            businessMembership: {
+              findUnique: vi.fn(),
+            },
+            rolePermission: {
+              findMany: vi.fn(),
+            },
+          },
+        },
       ],
     }).compile();
 
@@ -67,7 +72,7 @@ describe('BusinessController', () => {
     expect(controller).toBeDefined();
   });
 
-    describe('addMember', () => {
+  describe('addMember', () => {
     it('should add a member to the specified business', async () => {
       const dto = {
         email: 'jane@example.com',
@@ -116,7 +121,7 @@ describe('BusinessController', () => {
     });
   });
 
-    describe('updateMemberRole', () => {
+  describe('updateMemberRole', () => {
     it('should update a member role in the specified business', async () => {
       const dto = {
         roleId: 'role-manager',
@@ -166,7 +171,7 @@ describe('BusinessController', () => {
     });
   });
 
-    describe('removeMember', () => {
+  describe('removeMember', () => {
     it('should remove a member from the specified business', async () => {
       const fakeResult = {
         message: 'Team member removed successfully.',
@@ -241,6 +246,87 @@ describe('BusinessController', () => {
     });
   });
 
+  describe('findCustomer', () => {
+  it('should retrieve a customer for the specified business', async () => {
+    const fakeCustomer = {
+      id: 'customer-123',
+      businessId: 'business-123',
+      name: 'John Doe',
+    };
+
+    mockBusinessService.findCustomer.mockResolvedValue(
+    fakeCustomer,
+    );
+
+    const result = await controller.findCustomer(
+      'business-123',
+      'customer-123',
+    );
+
+    expect(mockBusinessService.findCustomer).toHaveBeenCalledWith(
+      'business-123',
+      'customer-123',
+    );
+
+    expect(result).toEqual(fakeCustomer);
+  });
+
+  it('should require the customers.read permission', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      BusinessController.prototype.findCustomer,
+    );
+
+    expect(permissions).toContain('customers.read');
+  });
+});
+
+  describe('updateCustomer', () => {
+    it('should update a customer for the specified business', async () => {
+      const dto = {
+        name: 'John Updated',
+        phone: '0798765432',
+      };
+
+      const updatedCustomer = {
+        id: 'customer-123',
+        businessId: 'business-123',
+        name: 'John Updated',
+        phone: '0798765432',
+      };
+
+      mockBusinessService.updateCustomer.mockResolvedValue({
+        message: 'Customer updated successfully.',
+        customer: updatedCustomer,
+      });
+
+      const result = await controller.updateCustomer(
+        'business-123',
+        'customer-123',
+        dto,
+      );
+
+      expect(
+        mockBusinessService.updateCustomer,
+      ).toHaveBeenCalledWith(
+        'business-123',
+        'customer-123',
+        dto,
+      );
+
+      expect(result.customer).toEqual(updatedCustomer);
+    });
+
+    it('should require the customers.update permission', () => {
+      const permissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.updateCustomer,
+      );
+
+      expect(permissions).toContain('customers.update');
+    });
+  });
+
   describe('findRoles', () => {
     it('should retrieve roles for the specified business', async () => {
       const fakeRoles = [
@@ -272,7 +358,7 @@ describe('BusinessController', () => {
     });
   });
 
-    describe('createRole', () => {
+  describe('createRole', () => {
     it('should create a custom role for the specified business', async () => {
       const dto = {
         name: 'Supervisor',
@@ -312,6 +398,87 @@ describe('BusinessController', () => {
       );
 
       expect(requiredPermissions).toEqual(['roles.manage']);
+    });
+  });
+
+  describe('createCustomer', () => {
+    it('should create a customer for the specified business', async () => {
+      const dto = {
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '0712345678',
+        address: 'Nairobi',
+      };
+
+      const fakeResult = {
+        message: 'Customer created successfully.',
+        customer: {
+          id: 'customer-123',
+          businessId: 'business-123',
+          ...dto,
+        },
+      };
+
+      mockBusinessService.createCustomer.mockResolvedValue(fakeResult);
+
+      const result = await controller.createCustomer(
+        'business-123',
+        dto,
+      );
+
+      expect(mockBusinessService.createCustomer).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the customers.create permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.createCustomer,
+      );
+
+      expect(requiredPermissions).toEqual(['customers.create']);
+    });
+  });
+
+  describe('findCustomers', () => {
+    it('should retrieve customers for the specified business', async () => {
+      const fakeCustomers = [
+        {
+          id: 'customer-123',
+          businessId: 'business-123',
+          name: 'John Doe',
+          email: 'john@example.com',
+          phone: '0712345678',
+          address: 'Nairobi',
+        },
+      ];
+
+      mockBusinessService.findCustomers.mockResolvedValue(
+        fakeCustomers,
+      );
+
+      const result = await controller.findCustomers(
+        'business-123',
+      );
+
+      expect(
+        mockBusinessService.findCustomers,
+      ).toHaveBeenCalledWith('business-123');
+
+      expect(result).toEqual(fakeCustomers);
+    });
+
+    it('should require the customers.read permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findCustomers,
+      );
+
+      expect(requiredPermissions).toEqual(['customers.read']);
     });
   });
 });

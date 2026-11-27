@@ -1,3 +1,5 @@
+import { UpdateCustomerDto } from './dto/update-customer.dto.js';
+import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
 import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
@@ -96,6 +98,56 @@ export class BusinessController {
     @Param('businessId') businessId: string,
   ) {
     return this.businessService.findRoles(businessId);
+  }
+
+  @Post(':businessId/customers')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('customers.create')
+  createCustomer(
+    @Param('businessId') businessId: string,
+    @Body() dto: CreateCustomerDto,
+  ) {
+    return this.businessService.createCustomer(
+      businessId,
+      dto,
+    );
+  }
+
+  @Get(':businessId/customers')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('customers.read')
+  findCustomers(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findCustomers(businessId);
+  }
+
+    @Get(':businessId/customers/:customerId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('customers.read')
+  findCustomer(
+    @Param('businessId') businessId: string,
+    @Param('customerId') customerId: string,
+  ) {
+    return this.businessService.findCustomer(
+      businessId,
+      customerId,
+    );
+  }
+
+  @Patch(':businessId/customers/:customerId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('customers.update')
+  updateCustomer(
+    @Param('businessId') businessId: string,
+    @Param('customerId') customerId: string,
+    @Body() dto: UpdateCustomerDto,
+  ) {
+    return this.businessService.updateCustomer(
+      businessId,
+      customerId,
+      dto,
+    );
   }
 
   @Post(':businessId/roles')

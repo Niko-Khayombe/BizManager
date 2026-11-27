@@ -151,6 +151,12 @@ describe('BusinessService', () => {
     businessMembership: {
       findMany: vi.fn(),
     },
+    customer: {
+     create: vi.fn(),
+     findMany: vi.fn(),
+     findFirst: vi.fn(),
+     update: vi.fn(),
+    },
     role: {
       findMany: vi.fn(),
     },
@@ -178,6 +184,252 @@ describe('BusinessService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('createCustomer', () => {
+  it('should create a customer with normalized details', async () => {
+    const dto = {
+      name: '  John Doe  ',
+      email: '  JOHN@EXAMPLE.COM  ',
+      phone: '  0712345678  ',
+      address: '  Nairobi  ',
+    };
+
+    const fakeCustomer = {
+      id: 'customer-123',
+      businessId: 'business-123',
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '0712345678',
+      address: 'Nairobi',
+    };
+
+    mockPrisma.customer.create.mockResolvedValue(fakeCustomer);
+
+    const result = await service.createCustomer(
+      'business-123',
+      dto,
+    );
+
+    expect(mockPrisma.customer.create).toHaveBeenCalledWith({
+      data: {
+        businessId: 'business-123',
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '0712345678',
+        address: 'Nairobi',
+      },
+    });
+
+    expect(result.customer).toEqual(fakeCustomer);
+    expect(result.message).toBe('Customer created successfully.');
+  });
+
+  it('should reject an empty customer name', async () => {
+    await expect(
+      service.createCustomer('business-123', {
+        name: '   ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.customer.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('findCustomers', () => {
+  it('should retrieve customers belonging to the specified business', async () => {
+    const fakeCustomers = [
+      {
+        id: 'customer-123',
+        businessId: 'business-123',
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '0712345678',
+        address: 'Nairobi',
+      },
+    ];
+
+    mockPrisma.customer.findMany.mockResolvedValue(fakeCustomers);
+
+    const result = await service.findCustomers('business-123');
+
+    expect(mockPrisma.customer.findMany).toHaveBeenCalledWith({
+      where: {
+        businessId: 'business-123',
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    expect(result).toEqual(fakeCustomers);
+  });
+
+  it('should return an empty array when no customers exist', async () => {
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+
+    const result = await service.findCustomers('business-123');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('findCustomer', () => {
+  it('should retrieve a customer belonging to the specified business', async () => {
+    const fakeCustomer = {
+      id: 'customer-123',
+      businessId: 'business-123',
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '0712345678',
+      address: 'Nairobi',
+    };
+
+    mockPrisma.customer.findFirst.mockResolvedValue(fakeCustomer);
+
+    const result = await service.findCustomer(
+      'business-123',
+      'customer-123',
+    );
+
+    expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'customer-123',
+        businessId: 'business-123',
+      },
+    });
+
+    expect(result).toEqual(fakeCustomer);
+  });
+
+  it('should reject a customer who belongs to another business', async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.findCustomer('business-123', 'customer-456'),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('should reject a customer who does not exist', async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.findCustomer('business-123', 'customer-999'),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('updateCustomer', () => {
+  it('should update a customer belonging to the specified business', async () => {
+    const existingCustomer = {
+      id: 'customer-123',
+    };
+
+    const updatedCustomer = {
+      id: 'customer-123',
+      businessId: 'business-123',
+      name: 'John Updated',
+      email: 'john@example.com',
+      phone: '0798765432',
+      address: 'Nairobi',
+    };
+
+    mockPrisma.customer.findFirst.mockResolvedValue(
+      existingCustomer,
+    );
+
+    mockPrisma.customer.update.mockResolvedValue(
+      updatedCustomer,
+    );
+
+    const result = await service.updateCustomer(
+      'business-123',
+      'customer-123',
+      {
+        name: ' John Updated ',
+        phone: ' 0798765432 ',
+      },
+    );
+
+    expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'customer-123',
+        businessId: 'business-123',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    expect(mockPrisma.customer.update).toHaveBeenCalledWith({
+      where: {
+        id: 'customer-123',
+      },
+      data: {
+        name: 'John Updated',
+        phone: '0798765432',
+      },
+    });
+
+    expect(result.customer).toEqual(updatedCustomer);
+  });
+
+  it('should reject a customer belonging to another business', async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateCustomer('business-123', 'customer-456', {
+        name: 'Updated Name',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
+  });
+
+  it('should reject an empty customer name', async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: 'customer-123',
+    });
+
+    await expect(
+      service.updateCustomer('business-123', 'customer-123', {
+        name: '   ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
+  });
+
+  it('should normalize email, phone and address', async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: 'customer-123',
+    });
+
+    mockPrisma.customer.update.mockResolvedValue({
+      id: 'customer-123',
+    });
+
+    await service.updateCustomer(
+      'business-123',
+      'customer-123',
+      {
+        email: ' JOHN@EXAMPLE.COM ',
+        phone: ' 0712345678 ',
+        address: ' Nairobi ',
+      },
+    );
+
+    expect(mockPrisma.customer.update).toHaveBeenCalledWith({
+      where: {
+        id: 'customer-123',
+      },
+      data: {
+        email: 'john@example.com',
+        phone: '0712345678',
+        address: 'Nairobi',
+      },
+    });
+  });
+});
 
   describe('create', () => {
     it('should reject an empty business name', async () => {

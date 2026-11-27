@@ -1,3 +1,5 @@
+import { CreateCustomerDto } from './dto/create-customer.dto.js';
+import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 import { Prisma } from '@prisma/client';
 import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
 import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
@@ -593,6 +595,130 @@ async removeMember(
       member: membership.user,
     };
   });
+}
+
+async createCustomer(
+  businessId: string,
+  dto: CreateCustomerDto,
+) {
+  const name = dto.name.trim();
+
+  if (!name) {
+    throw new BadRequestException(
+      'Customer name cannot be empty.',
+    );
+  }
+
+  const customer = await this.prisma.customer.create({
+    data: {
+      businessId,
+      name,
+      email: dto.email?.trim().toLowerCase() || null,
+      phone: dto.phone?.trim() || null,
+      address: dto.address?.trim() || null,
+    },
+  });
+
+  return {
+    message: 'Customer created successfully.',
+    customer,
+  };
+}
+
+async findCustomers(businessId: string) {
+  return this.prisma.customer.findMany({
+    where: {
+      businessId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
+
+async findCustomer(
+  businessId: string,
+  customerId: string,
+) {
+  const customer = await this.prisma.customer.findFirst({
+    where: {
+      id: customerId,
+      businessId,
+    },
+  });
+
+  if (!customer) {
+    throw new NotFoundException(
+      'Customer not found in this business.',
+    );
+  }
+
+  return customer;
+}
+
+async updateCustomer(
+  businessId: string,
+  customerId: string,
+  dto: UpdateCustomerDto,
+) {
+  const existingCustomer = await this.prisma.customer.findFirst({
+    where: {
+      id: customerId,
+      businessId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingCustomer) {
+    throw new NotFoundException(
+      'Customer not found in this business.',
+    );
+  }
+
+  const data: {
+    name?: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+  } = {};
+
+  if (dto.name !== undefined) {
+    const name = dto.name.trim();
+
+    if (!name) {
+      throw new BadRequestException(
+        'Customer name cannot be empty.',
+      );
+    }
+
+    data.name = name;
+  }
+
+  if (dto.email !== undefined) {
+    data.email = dto.email.trim().toLowerCase() || null;
+  }
+
+  if (dto.phone !== undefined) {
+    data.phone = dto.phone.trim() || null;
+  }
+
+  if (dto.address !== undefined) {
+    data.address = dto.address.trim() || null;
+  }
+
+  const customer = await this.prisma.customer.update({
+    where: {
+      id: existingCustomer.id,
+    },
+    data,
+  });
+
+  return {
+    message: 'Customer updated successfully.',
+    customer,
+  };
 }
 
 async findOne(businessId: string) {
