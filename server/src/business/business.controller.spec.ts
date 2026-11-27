@@ -17,6 +17,7 @@ describe('BusinessController', () => {
     addMember: vi.fn(),
     updateMemberRole: vi.fn(),
     findMyBusinesses: vi.fn(),
+    removeMember: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
   };
@@ -157,6 +158,41 @@ describe('BusinessController', () => {
       const requiredPermissions = Reflect.getMetadata(
         PERMISSIONS_KEY,
         BusinessController.prototype.updateMemberRole,
+      );
+
+      expect(requiredPermissions).toEqual(['users.manage']);
+    });
+  });
+
+    describe('removeMember', () => {
+    it('should remove a member from the specified business', async () => {
+      const fakeResult = {
+        message: 'Team member removed successfully.',
+        member: {
+          name: 'Jane Doe',
+          email: 'jane@example.com',
+        },
+      };
+
+      mockBusinessService.removeMember.mockResolvedValue(fakeResult);
+
+      const result = await controller.removeMember(
+        'business-123',
+        'membership-456',
+      );
+
+      expect(mockBusinessService.removeMember).toHaveBeenCalledWith(
+        'business-123',
+        'membership-456',
+      );
+
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the users.manage permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.removeMember,
       );
 
       expect(requiredPermissions).toEqual(['users.manage']);

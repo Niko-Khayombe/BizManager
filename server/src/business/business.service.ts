@@ -398,6 +398,57 @@ async updateMemberRole(
   });
 }
 
+async removeMember(
+  businessId: string,
+  membershipId: string,
+) {
+  return this.prisma.$transaction(async (tx) => {
+    const membership = await tx.businessMembership.findFirst({
+      where: {
+        id: membershipId,
+        businessId,
+      },
+      select: {
+        id: true,
+        role: {
+          select: {
+            key: true,
+          },
+        },
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundException(
+        'Team member not found in this business.',
+      );
+    }
+
+    if (membership.role.key === 'OWNER') {
+      throw new BadRequestException(
+        'The Owner cannot be removed from the business.',
+      );
+    }
+
+    await tx.businessMembership.delete({
+      where: {
+        id: membership.id,
+      },
+    });
+
+    return {
+      message: 'Team member removed successfully.',
+      member: membership.user,
+    };
+  });
+}
+
 async findOne(businessId: string) {
   const business = await this.prisma.business.findUnique({
     where: {

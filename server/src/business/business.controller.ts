@@ -2,6 +2,7 @@ import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.d
 import {
   Body,
   Controller,
+  Delete,
   Post,
   Param,
   Patch,
@@ -78,13 +79,26 @@ export class BusinessController {
     );
   }
 
-  @Get(':businessId/members')
+    @Get(':businessId/members')
   @UseGuards(BusinessMembershipGuard, PermissionsGuard)
   @RequirePermissions('users.read')
   findMembers(
     @Param('businessId') businessId: string,
   ) {
     return this.businessService.findMembers(businessId);
+  }
+
+  @Delete(':businessId/members/:membershipId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('users.manage')
+  removeMember(
+    @Param('businessId') businessId: string,
+    @Param('membershipId') membershipId: string,
+  ) {
+    return this.businessService.removeMember(
+      businessId,
+      membershipId,
+    );
   }
 
   @Get(':businessId')

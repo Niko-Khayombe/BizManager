@@ -608,6 +608,120 @@ for (const role of fakeRoles) {
     });
   });
 
+    describe('removeMember', () => {
+    const createTransaction = () => ({
+      businessMembership: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'membership-456',
+          role: {
+            key: 'SALES',
+          },
+          user: {
+            name: 'Jane Doe',
+            email: 'jane@example.com',
+          },
+        }),
+        delete: vi.fn().mockResolvedValue({
+          id: 'membership-456',
+        }),
+      },
+    });
+
+    it('should remove a member successfully', async () => {
+      const tx = createTransaction();
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.removeMember(
+        'business-123',
+        'membership-456',
+      );
+
+      expect(tx.businessMembership.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'membership-456',
+          businessId: 'business-123',
+        },
+        select: {
+          id: true,
+          role: {
+            select: {
+              key: true,
+            },
+          },
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      expect(tx.businessMembership.delete).toHaveBeenCalledWith({
+        where: {
+          id: 'membership-456',
+        },
+      });
+
+      expect(result).toEqual({
+        message: 'Team member removed successfully.',
+        member: {
+          name: 'Jane Doe',
+          email: 'jane@example.com',
+        },
+      });
+    });
+
+    it('should reject a membership not found in the business', async () => {
+      const tx = createTransaction();
+      tx.businessMembership.findFirst.mockResolvedValue(null);
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.removeMember(
+          'business-123',
+          'missing-membership',
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(tx.businessMembership.delete).not.toHaveBeenCalled();
+    });
+
+    it('should prevent removing the Owner', async () => {
+      const tx = createTransaction();
+
+      tx.businessMembership.findFirst.mockResolvedValue({
+        id: 'owner-membership',
+        role: {
+          key: 'OWNER',
+        },
+        user: {
+          name: 'Business Owner',
+          email: 'owner@example.com',
+        },
+      });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.removeMember(
+          'business-123',
+          'owner-membership',
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tx.businessMembership.delete).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findMyBusinesses', () => {
     it('should return only the memberships belonging to the user', async () => {
       mockPrisma.businessMembership.findMany.mockResolvedValue([
