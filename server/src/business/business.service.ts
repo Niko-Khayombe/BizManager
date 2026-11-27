@@ -721,6 +721,28 @@ async updateCustomer(
   };
 }
 
+async deleteCustomer(
+  businessId: string,
+  customerId: string,
+) {
+  const result = await this.prisma.customer.deleteMany({
+    where: {
+      id: customerId,
+      businessId,
+    },
+  });
+
+  if (result.count === 0) {
+    throw new NotFoundException(
+      'Customer not found in this business.',
+    );
+  }
+
+  return {
+    message: 'Customer deleted successfully.',
+  };
+}
+
 async findOne(businessId: string) {
   const business = await this.prisma.business.findUnique({
     where: {

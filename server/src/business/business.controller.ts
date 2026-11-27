@@ -150,6 +150,19 @@ export class BusinessController {
     );
   }
 
+    @Delete(':businessId/customers/:customerId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('customers.delete')
+  deleteCustomer(
+    @Param('businessId') businessId: string,
+    @Param('customerId') customerId: string,
+  ) {
+    return this.businessService.deleteCustomer(
+      businessId,
+      customerId,
+    );
+  }
+
   @Post(':businessId/roles')
   @UseGuards(BusinessMembershipGuard, PermissionsGuard)
   @RequirePermissions('roles.manage')

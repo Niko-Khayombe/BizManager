@@ -20,6 +20,7 @@ describe('BusinessController', () => {
     findCustomers: vi.fn(),
     findCustomer: vi.fn(),
     updateCustomer: vi.fn(),
+    deleteCustomer: vi.fn(),
     createRole: vi.fn(),
     updateMemberRole: vi.fn(),
     findRoles: vi.fn(),
@@ -324,6 +325,39 @@ describe('BusinessController', () => {
       );
 
       expect(permissions).toContain('customers.update');
+    });
+  });
+
+    describe('deleteCustomer', () => {
+    it('should delete a customer for the specified business', async () => {
+      mockBusinessService.deleteCustomer.mockResolvedValue({
+        message: 'Customer deleted successfully.',
+      });
+
+      const result = await controller.deleteCustomer(
+        'business-123',
+        'customer-123',
+      );
+
+      expect(
+        mockBusinessService.deleteCustomer,
+      ).toHaveBeenCalledWith(
+        'business-123',
+        'customer-123',
+      );
+
+      expect(result).toEqual({
+        message: 'Customer deleted successfully.',
+      });
+    });
+
+    it('should require the customers.delete permission', () => {
+      const permissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.deleteCustomer,
+      );
+
+      expect(permissions).toContain('customers.delete');
     });
   });
 

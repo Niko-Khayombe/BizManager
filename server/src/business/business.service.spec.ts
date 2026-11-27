@@ -153,6 +153,7 @@ describe('BusinessService', () => {
     },
     customer: {
      create: vi.fn(),
+     deleteMany: vi.fn(),
      findMany: vi.fn(),
      findFirst: vi.fn(),
      update: vi.fn(),
@@ -428,6 +429,40 @@ describe('updateCustomer', () => {
         address: 'Nairobi',
       },
     });
+  });
+});
+
+describe('deleteCustomer', () => {
+  it('should delete a customer belonging to the specified business', async () => {
+    mockPrisma.customer.deleteMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const result = await service.deleteCustomer(
+      'business-123',
+      'customer-123',
+    );
+
+    expect(mockPrisma.customer.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'customer-123',
+        businessId: 'business-123',
+      },
+    });
+
+    expect(result).toEqual({
+      message: 'Customer deleted successfully.',
+    });
+  });
+
+  it('should reject a customer not found in the specified business', async () => {
+    mockPrisma.customer.deleteMany.mockResolvedValue({
+      count: 0,
+    });
+
+    await expect(
+      service.deleteCustomer('business-123', 'customer-456'),
+    ).rejects.toThrow(NotFoundException);
   });
 });
 
