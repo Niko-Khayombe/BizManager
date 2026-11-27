@@ -1,4 +1,4 @@
-
+import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
   BadRequestException,
   ConflictException,
@@ -296,6 +296,103 @@ async addMember(
         joinedAt: membership.createdAt,
         user: membership.user,
         role: membership.role,
+      },
+    };
+  });
+}
+
+async updateMemberRole(
+  businessId: string,
+  membershipId: string,
+  dto: UpdateBusinessMemberRoleDto,
+) {
+  return this.prisma.$transaction(async (tx) => {
+    const membership = await tx.businessMembership.findFirst({
+      where: {
+        id: membershipId,
+        businessId,
+      },
+      select: {
+        id: true,
+        role: {
+          select: {
+            key: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundException(
+        'Team member not found in this business.',
+      );
+    }
+
+    if (membership.role.key === 'OWNER') {
+      throw new BadRequestException(
+        'The Owner role cannot be changed through this operation.',
+      );
+    }
+
+    const role = await tx.role.findFirst({
+      where: {
+        id: dto.roleId,
+        businessId,
+      },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(
+        'Role not found in this business.',
+      );
+    }
+
+    if (role.key === 'OWNER') {
+      throw new BadRequestException(
+        'The Owner role cannot be assigned through this operation.',
+      );
+    }
+
+    const updatedMembership =
+      await tx.businessMembership.update({
+        where: {
+          id: membershipId,
+        },
+        data: {
+          roleId: role.id,
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          role: {
+            select: {
+              id: true,
+              name: true,
+              key: true,
+            },
+          },
+        },
+      });
+
+    return {
+      message: 'Team member role updated successfully.',
+      membership: {
+        membershipId: updatedMembership.id,
+        joinedAt: updatedMembership.createdAt,
+        user: updatedMembership.user,
+        role: updatedMembership.role,
       },
     };
   });

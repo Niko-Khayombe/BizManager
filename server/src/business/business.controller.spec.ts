@@ -15,6 +15,7 @@ describe('BusinessController', () => {
   const mockBusinessService = {
     findMembers: vi.fn(),
     addMember: vi.fn(),
+    updateMemberRole: vi.fn(),
     findMyBusinesses: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
@@ -106,6 +107,56 @@ describe('BusinessController', () => {
       const requiredPermissions = Reflect.getMetadata(
         PERMISSIONS_KEY,
         BusinessController.prototype.addMember,
+      );
+
+      expect(requiredPermissions).toEqual(['users.manage']);
+    });
+  });
+
+    describe('updateMemberRole', () => {
+    it('should update a member role in the specified business', async () => {
+      const dto = {
+        roleId: 'role-manager',
+      };
+
+      const fakeResult = {
+        message: 'Team member role updated successfully.',
+        membership: {
+          membershipId: 'membership-456',
+          user: {
+            id: 'user-456',
+            name: 'Jane Doe',
+            email: 'jane@example.com',
+          },
+          role: {
+            id: 'role-manager',
+            name: 'Manager',
+            key: 'MANAGER',
+          },
+        },
+      };
+
+      mockBusinessService.updateMemberRole.mockResolvedValue(fakeResult);
+
+      const result = await controller.updateMemberRole(
+        'business-123',
+        'membership-456',
+        dto,
+      );
+
+      expect(mockBusinessService.updateMemberRole).toHaveBeenCalledWith(
+        'business-123',
+        'membership-456',
+        dto,
+      );
+
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the users.manage permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.updateMemberRole,
       );
 
       expect(requiredPermissions).toEqual(['users.manage']);

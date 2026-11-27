@@ -434,6 +434,180 @@ for (const role of fakeRoles) {
   });
 });
 
+   describe('updateMemberRole', () => {
+    const createTransaction = () => ({
+      businessMembership: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'membership-456',
+          role: {
+            key: 'SALES',
+          },
+        }),
+        update: vi.fn().mockResolvedValue({
+          id: 'membership-456',
+          createdAt: new Date('2026-11-27T08:00:00.000Z'),
+          user: {
+            id: 'user-456',
+            name: 'Jane Doe',
+            email: 'jane@example.com',
+          },
+          role: {
+            id: 'role-manager',
+            name: 'Manager',
+            key: 'MANAGER',
+          },
+        }),
+      },
+      role: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'role-manager',
+          name: 'Manager',
+          key: 'MANAGER',
+        }),
+      },
+    });
+
+    it('should update a member role successfully', async () => {
+      const tx = createTransaction();
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.updateMemberRole(
+        'business-123',
+        'membership-456',
+        { roleId: 'role-manager' },
+      );
+
+      expect(tx.businessMembership.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'membership-456',
+          businessId: 'business-123',
+        },
+        select: {
+          id: true,
+          role: {
+            select: {
+              key: true,
+            },
+          },
+        },
+      });
+
+      expect(tx.role.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'role-manager',
+          businessId: 'business-123',
+        },
+        select: {
+          id: true,
+          name: true,
+          key: true,
+        },
+      });
+
+      expect(tx.businessMembership.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'membership-456' },
+          data: { roleId: 'role-manager' },
+        }),
+      );
+
+      expect(result.membership.role.key).toBe('MANAGER');
+      expect(result.membership.user).not.toHaveProperty(
+        'passwordHash',
+      );
+    });
+
+    it('should reject a membership not found in the business', async () => {
+      const tx = createTransaction();
+      tx.businessMembership.findFirst.mockResolvedValue(null);
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.updateMemberRole(
+          'business-123',
+          'missing-membership',
+          { roleId: 'role-manager' },
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(tx.role.findFirst).not.toHaveBeenCalled();
+      expect(tx.businessMembership.update).not.toHaveBeenCalled();
+    });
+
+    it('should prevent changing the Owner role', async () => {
+      const tx = createTransaction();
+
+      tx.businessMembership.findFirst.mockResolvedValue({
+        id: 'owner-membership',
+        role: { key: 'OWNER' },
+      });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.updateMemberRole(
+          'business-123',
+          'owner-membership',
+          { roleId: 'role-manager' },
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tx.role.findFirst).not.toHaveBeenCalled();
+      expect(tx.businessMembership.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject a role that does not belong to the business', async () => {
+      const tx = createTransaction();
+      tx.role.findFirst.mockResolvedValue(null);
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.updateMemberRole(
+          'business-123',
+          'membership-456',
+          { roleId: 'foreign-role' },
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(tx.businessMembership.update).not.toHaveBeenCalled();
+    });
+
+    it('should prevent assigning the Owner role', async () => {
+      const tx = createTransaction();
+
+      tx.role.findFirst.mockResolvedValue({
+        id: 'role-owner',
+        name: 'Owner',
+        key: 'OWNER',
+      });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.updateMemberRole(
+          'business-123',
+          'membership-456',
+          { roleId: 'role-owner' },
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tx.businessMembership.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findMyBusinesses', () => {
     it('should return only the memberships belonging to the user', async () => {
       mockPrisma.businessMembership.findMany.mockResolvedValue([

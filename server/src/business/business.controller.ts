@@ -1,8 +1,10 @@
+import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
   Body,
   Controller,
   Post,
   Param,
+  Patch,
   Get,
   Req,
   UseGuards,
@@ -57,6 +59,21 @@ export class BusinessController {
   ) {
     return this.businessService.addMember(
       businessId,
+      dto,
+    );
+  }
+
+  @Patch(':businessId/members/:membershipId/role')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('users.manage')
+  updateMemberRole(
+    @Param('businessId') businessId: string,
+    @Param('membershipId') membershipId: string,
+    @Body() dto: UpdateBusinessMemberRoleDto,
+  ) {
+    return this.businessService.updateMemberRole(
+      businessId,
+      membershipId,
       dto,
     );
   }
