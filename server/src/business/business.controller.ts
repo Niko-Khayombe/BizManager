@@ -79,13 +79,22 @@ export class BusinessController {
     );
   }
 
-    @Get(':businessId/members')
+  @Get(':businessId/members')
   @UseGuards(BusinessMembershipGuard, PermissionsGuard)
   @RequirePermissions('users.read')
   findMembers(
     @Param('businessId') businessId: string,
   ) {
     return this.businessService.findMembers(businessId);
+  }
+
+  @Get(':businessId/roles')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('roles.read')
+  findRoles(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findRoles(businessId);
   }
 
   @Delete(':businessId/members/:membershipId')

@@ -198,6 +198,22 @@ async findMembers(businessId: string) {
   }));
 }
 
+async findRoles(businessId: string) {
+  return this.prisma.role.findMany({
+    where: {
+      businessId,
+    },
+    select: {
+      id: true,
+      name: true,
+      key: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+}
+
 async addMember(
   businessId: string,
   dto: AddBusinessMemberDto,

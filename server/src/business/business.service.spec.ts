@@ -100,9 +100,57 @@ describe('BusinessService', () => {
   });
 });
 
+  describe('findRoles', () => {
+    it('should return roles belonging to the specified business', async () => {
+      const fakeRoles = [
+        {
+          id: 'role-123',
+          name: 'Accountant',
+          key: 'ACCOUNTANT',
+        },
+        {
+          id: 'role-456',
+          name: 'Sales',
+          key: 'SALES',
+        },
+      ];
+
+      mockPrisma.role.findMany.mockResolvedValue(fakeRoles);
+
+      const result = await service.findRoles('business-123');
+
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith({
+        where: {
+          businessId: 'business-123',
+        },
+        select: {
+          id: true,
+          name: true,
+          key: true,
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      });
+
+      expect(result).toEqual(fakeRoles);
+    });
+
+    it('should return an empty array when no roles exist', async () => {
+      mockPrisma.role.findMany.mockResolvedValue([]);
+
+      const result = await service.findRoles('business-123');
+
+      expect(result).toEqual([]);
+    });
+  });
+
   const mockPrisma = {
     $transaction: vi.fn(),
     businessMembership: {
+      findMany: vi.fn(),
+    },
+    role: {
       findMany: vi.fn(),
     },
     business: {

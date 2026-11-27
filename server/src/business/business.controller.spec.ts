@@ -16,6 +16,7 @@ describe('BusinessController', () => {
     findMembers: vi.fn(),
     addMember: vi.fn(),
     updateMemberRole: vi.fn(),
+    findRoles: vi.fn(),
     findMyBusinesses: vi.fn(),
     removeMember: vi.fn(),
     findOne: vi.fn(),
@@ -238,4 +239,36 @@ describe('BusinessController', () => {
       expect(requiredPermissions).toEqual(['users.read']);
     });
   });
+
+  describe('findRoles', () => {
+    it('should retrieve roles for the specified business', async () => {
+      const fakeRoles = [
+        {
+          id: 'role-123',
+          name: 'Sales',
+          key: 'SALES',
+        },
+      ];
+
+      mockBusinessService.findRoles.mockResolvedValue(fakeRoles);
+
+      const result = await controller.findRoles('business-123');
+
+      expect(mockBusinessService.findRoles).toHaveBeenCalledWith(
+        'business-123',
+      );
+
+      expect(result).toEqual(fakeRoles);
+    });
+
+    it('should require the roles.read permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findRoles,
+      );
+
+      expect(requiredPermissions).toEqual(['roles.read']);
+    });
+  });
+
 });
