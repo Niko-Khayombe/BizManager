@@ -47,6 +47,9 @@ describe('BusinessController', () => {
     issueStock: vi.fn(),
     adjustStock: vi.fn(),
     transferStock: vi.fn(),
+    findStockLevels: vi.fn(),
+    findLowStockProducts: vi.fn(),
+    findStockMovements: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -1049,6 +1052,97 @@ describe('deleteCategory', () => {
       ).toEqual(['inventory.locations.delete']);
     });
   });
+
+  describe('inventory query endpoints', () => {
+  it('should retrieve stock levels', async () => {
+    const dto = {
+      productId: 'product-123',
+      locationId: 'location-123',
+      lowStockOnly: 'true',
+    };
+    const fakeResult = {
+      total: 1,
+      stocks: [{ productId: 'product-123', quantity: 2 }],
+    };
+
+    mockBusinessService.findStockLevels.mockResolvedValue(fakeResult);
+
+    const result = await controller.findStockLevels('business-123', dto);
+
+    expect(mockBusinessService.findStockLevels).toHaveBeenCalledWith(
+      'business-123',
+      dto,
+    );
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should retrieve low-stock products', async () => {
+    const fakeResult = {
+      total: 1,
+      products: [{ id: 'product-123', name: 'Product A' }],
+    };
+
+    mockBusinessService.findLowStockProducts.mockResolvedValue(fakeResult);
+
+    const result = await controller.findLowStockProducts('business-123');
+
+    expect(mockBusinessService.findLowStockProducts).toHaveBeenCalledWith(
+      'business-123',
+    );
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should retrieve paginated stock movements', async () => {
+    const dto = {
+      productId: 'product-123',
+      locationId: 'location-123',
+      page: 1,
+      limit: 20,
+    };
+    const fakeResult = {
+      movements: [],
+      pagination: {
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+      },
+    };
+
+    mockBusinessService.findStockMovements.mockResolvedValue(fakeResult);
+
+    const result = await controller.findStockMovements('business-123', dto);
+
+    expect(mockBusinessService.findStockMovements).toHaveBeenCalledWith(
+      'business-123',
+      dto,
+    );
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should require the correct inventory query permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findStockLevels,
+      ),
+    ).toEqual(['inventory.stock.read']);
+
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findLowStockProducts,
+      ),
+    ).toEqual(['inventory.stock.read']);
+
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findStockMovements,
+      ),
+    ).toEqual(['inventory.movements.read']);
+  });
+});
 
     describe('stock transaction endpoints', () => {
     it('should receive stock', async () => {

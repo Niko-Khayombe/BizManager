@@ -187,9 +187,11 @@ describe('BusinessService', () => {
     },
     productStock: {
       count: vi.fn(),
+      findMany: vi.fn(),
     },
     stockMovement: {
       count: vi.fn(),
+      findMany: vi.fn(),
     },
   };
 
@@ -268,6 +270,7 @@ describe('BusinessService', () => {
         barcode: '123456789',
         costPrice: 0,
         sellingPrice: 75000,
+        minimumStock: 0,
         isActive: true,
       },
     });
@@ -2061,6 +2064,126 @@ for (const role of fakeRoles) {
 
       expect(mockPrisma.stockLocation.delete).not.toHaveBeenCalled();
     });
+
+    describe('inventory queries', () => {
+  it('should return stock levels scoped to the business', async () => {
+    const stocks = [
+      {
+        id: 'stock-1',
+        businessId: 'business-123',
+        quantity: new Prisma.Decimal(5),
+        product: {
+          id: 'product-1',
+          name: 'Laptop',
+          minimumStock: new Prisma.Decimal(3),
+        },
+        location: { id: 'location-1', name: 'Warehouse' },
+      },
+    ];
+
+    mockPrisma.productStock.findMany.mockResolvedValue(stocks);
+
+    const result = await service.findStockLevels('business-123', {});
+
+    expect(mockPrisma.productStock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { businessId: 'business-123' },
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.stocks[0].isLowStock).toBe(false);
+  });
+
+  it('should filter stock levels to low-stock items when requested', async () => {
+    mockPrisma.productStock.findMany.mockResolvedValue([
+      {
+        id: 'stock-1',
+        quantity: new Prisma.Decimal(2),
+        product: {
+          id: 'product-1',
+          minimumStock: new Prisma.Decimal(5),
+        },
+        location: { id: 'location-1' },
+      },
+      {
+        id: 'stock-2',
+        quantity: new Prisma.Decimal(10),
+        product: {
+          id: 'product-2',
+          minimumStock: new Prisma.Decimal(5),
+        },
+        location: { id: 'location-1' },
+      },
+    ]);
+
+    const result = await service.findStockLevels(
+      'business-123',
+      { lowStockOnly: 'true' },
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.stocks[0].id).toBe('stock-1');
+  });
+
+  it('should return products whose combined stock is at or below minimum', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([
+      {
+        id: 'product-1',
+        name: 'Laptop',
+        minimumStock: new Prisma.Decimal(10),
+        stocks: [
+          { quantity: new Prisma.Decimal(4), location: { id: 'loc-1' } },
+          { quantity: new Prisma.Decimal(3), location: { id: 'loc-2' } },
+        ],
+      },
+      {
+        id: 'product-2',
+        name: 'Mouse',
+        minimumStock: new Prisma.Decimal(5),
+        stocks: [
+          { quantity: new Prisma.Decimal(20), location: { id: 'loc-1' } },
+        ],
+      },
+    ]);
+
+    const result = await service.findLowStockProducts('business-123');
+
+    expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { businessId: 'business-123', isActive: true },
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.products[0].id).toBe('product-1');
+    expect(result.products[0].totalQuantity.toString()).toBe('7');
+  });
+
+  it('should return paginated stock movements', async () => {
+    const movements = [{ id: 'movement-1', type: 'RECEIPT' }];
+
+    mockPrisma.stockMovement.findMany.mockResolvedValue(movements);
+    mockPrisma.stockMovement.count.mockResolvedValue(21);
+
+    const result = await service.findStockMovements(
+      'business-123',
+      { page: 2, limit: 10 },
+    );
+
+    expect(mockPrisma.stockMovement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { businessId: 'business-123' },
+        skip: 10,
+        take: 10,
+      }),
+    );
+    expect(result.pagination).toEqual({
+      total: 21,
+      page: 2,
+      limit: 10,
+      totalPages: 3,
+    });
+  });
+});
   });
 
     describe('stock transaction management', () => {

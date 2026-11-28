@@ -1,3 +1,5 @@
+import { GetStockLevelsDto } from './dto/get-stock-levels.dto.js';
+import { GetStockMovementsDto } from './dto/get-stock-movements.dto.js';
 import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
@@ -20,6 +22,7 @@ import {
   Param,
   Patch,
   Get,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -420,6 +423,35 @@ deleteCategory(
   @Body() dto: CreateStockTransferDto,
 ) {
   return this.businessService.transferStock(businessId, dto);
+}
+
+  @Get(':businessId/stock-levels')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('inventory.stock.read')
+findStockLevels(
+  @Param('businessId') businessId: string,
+  @Query() dto: GetStockLevelsDto,
+) {
+  return this.businessService.findStockLevels(businessId, dto);
+}
+
+@Get(':businessId/low-stock')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('inventory.stock.read')
+findLowStockProducts(
+  @Param('businessId') businessId: string,
+) {
+  return this.businessService.findLowStockProducts(businessId);
+}
+
+@Get(':businessId/stock-movements')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('inventory.movements.read')
+findStockMovements(
+  @Param('businessId') businessId: string,
+  @Query() dto: GetStockMovementsDto,
+) {
+  return this.businessService.findStockMovements(businessId, dto);
 }
 
   @Get(':businessId')

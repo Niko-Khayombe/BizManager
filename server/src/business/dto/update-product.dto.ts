@@ -42,6 +42,11 @@ export class UpdateProductDto {
   sellingPrice?: number;
 
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  minimumStock?: number;
+
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   categoryId?: string;

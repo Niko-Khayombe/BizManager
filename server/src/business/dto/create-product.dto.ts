@@ -37,6 +37,11 @@ export class CreateProductDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   sellingPrice: number;
+  
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  minimumStock?: number;
 
   @IsOptional()
   @IsString()

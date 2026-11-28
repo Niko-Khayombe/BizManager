@@ -1,3 +1,5 @@
+import { GetStockLevelsDto } from './dto/get-stock-levels.dto.js';
+import { GetStockMovementsDto } from './dto/get-stock-movements.dto.js';
 import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
@@ -10,7 +12,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { UpdateCustomerDto } from './dto/update-customer.dto.js';
-import { Prisma } from '@prisma/client';
+import { Prisma, StockMovementType } from '@prisma/client';
 import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
 import { UpdateBusinessMemberRoleDto } from './dto/update-business-member-role.dto.js';
 import {
@@ -656,6 +658,7 @@ async createProduct(
         barcode: dto.barcode?.trim() || null,
         costPrice: dto.costPrice ?? 0,
         sellingPrice: dto.sellingPrice,
+        minimumStock: dto.minimumStock ?? 0,
         isActive: dto.isActive ?? true,
       },
     });
@@ -776,6 +779,10 @@ async updateProduct(
 
   if (dto.sellingPrice !== undefined) {
     data.sellingPrice = dto.sellingPrice;
+  }
+
+  if (dto.minimumStock !== undefined) {
+  data.minimumStock = dto.minimumStock;
   }
 
   if (dto.isActive !== undefined) {
@@ -1728,6 +1735,126 @@ async transferStock(
       movement,
     };
   });
+}
+
+async findStockLevels(
+  businessId: string,
+  dto: GetStockLevelsDto,
+) {
+  const stocks = await this.prisma.productStock.findMany({
+    where: {
+      businessId,
+      ...(dto.productId ? { productId: dto.productId } : {}),
+      ...(dto.locationId ? { locationId: dto.locationId } : {}),
+    },
+    include: {
+      product: true,
+      location: true,
+    },
+    orderBy: [
+      { product: { name: 'asc' } },
+      { location: { name: 'asc' } },
+    ],
+  });
+
+  const results = stocks.map((stock) => ({
+    ...stock,
+    isLowStock: stock.quantity.lte(stock.product.minimumStock),
+  }));
+
+  const filteredStocks = dto.lowStockOnly === 'true'
+  ? results.filter((stock) => stock.isLowStock)
+  : results;
+
+  return {
+    total: filteredStocks.length,
+    stocks: filteredStocks,
+  };
+}
+
+async findLowStockProducts(businessId: string) {
+  const products = await this.prisma.product.findMany({
+    where: {
+      businessId,
+      isActive: true,
+    },
+    include: {
+      stocks: {
+        where: { businessId },
+        include: {
+          location: true,
+        },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const lowStockProducts = products
+    .map((product) => {
+      const totalQuantity = product.stocks.reduce(
+        (total, stock) => total.add(stock.quantity),
+        new Prisma.Decimal(0),
+      );
+
+      return {
+        ...product,
+        totalQuantity,
+        isLowStock: totalQuantity.lte(product.minimumStock),
+      };
+    })
+    .filter((product) => product.isLowStock);
+
+  return {
+    total: lowStockProducts.length,
+    products: lowStockProducts,
+  };
+}
+
+async findStockMovements(
+  businessId: string,
+  dto: GetStockMovementsDto,
+) {
+  const page = dto.page ?? 1;
+  const limit = dto.limit ?? 20;
+
+  const where: Prisma.StockMovementWhereInput = {
+    businessId,
+    ...(dto.productId ? { productId: dto.productId } : {}),
+    ...(dto.type ? { type: dto.type as StockMovementType } : {}),
+    ...(dto.locationId
+      ? {
+          OR: [
+            { fromLocationId: dto.locationId },
+            { toLocationId: dto.locationId },
+          ],
+        }
+      : {}),
+  };
+
+  const [movements, total] = await Promise.all([
+  this.prisma.stockMovement.findMany({
+    where,
+    include: {
+      product: true,
+      fromLocation: true,
+      toLocation: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    skip: (page - 1) * limit,
+    take: limit,
+  }),
+  this.prisma.stockMovement.count({ where }),
+]);
+
+  return {
+    movements,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 async findOne(businessId: string) {
