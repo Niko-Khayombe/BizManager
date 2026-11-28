@@ -1,3 +1,7 @@
+import { UpdateProductDto } from './dto/update-product.dto.js';
+import { CreateProductDto } from './dto/create-product.dto.js';
+import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { CreateBusinessRoleDto } from './dto/create-business-role.dto.js';
@@ -99,6 +103,126 @@ export class BusinessController {
   ) {
     return this.businessService.findRoles(businessId);
   }
+
+@Post(':businessId/products')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('products.create')
+createProduct(
+@Param('businessId') businessId: string,
+@Body() dto: CreateProductDto,
+) {
+  return this.businessService.createProduct(businessId, dto);
+}
+
+@Get(':businessId/products')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('products.read')
+findProducts(
+  @Param('businessId') businessId: string,
+) {
+  return this.businessService.findProducts(businessId);
+}
+
+@Get(':businessId/products/:productId')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('products.read')
+findProduct(
+  @Param('businessId') businessId: string,
+  @Param('productId') productId: string,
+) {
+  return this.businessService.findProduct(
+    businessId,
+    productId,
+  );
+}
+
+@Patch(':businessId/products/:productId')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('products.update')
+updateProduct(
+  @Param('businessId') businessId: string,
+  @Param('productId') productId: string,
+  @Body() dto: UpdateProductDto,
+) {
+  return this.businessService.updateProduct(
+    businessId,
+    productId,
+    dto,
+  );
+}
+
+@Delete(':businessId/products/:productId')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('products.delete')
+deleteProduct(
+  @Param('businessId') businessId: string,
+  @Param('productId') productId: string,
+) {
+  return this.businessService.deleteProduct(
+    businessId,
+    productId,
+  );
+}
+
+@Post(':businessId/categories')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('categories.create')
+createCategory(
+  @Param('businessId') businessId: string,
+  @Body() dto: CreateCategoryDto,
+) {
+  return this.businessService.createCategory(businessId, dto);
+}
+
+  @Get(':businessId/categories')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('categories.read')
+  findCategories(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findCategories(businessId);
+  }
+
+    @Get(':businessId/categories/:categoryId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('categories.read')
+  findCategory(
+    @Param('businessId') businessId: string,
+    @Param('categoryId') categoryId: string,
+  ) {
+    return this.businessService.findCategory(
+      businessId,
+      categoryId,
+    );
+  }
+
+  @Patch(':businessId/categories/:categoryId')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('categories.update')
+updateCategory(
+  @Param('businessId') businessId: string,
+  @Param('categoryId') categoryId: string,
+  @Body() dto: UpdateCategoryDto,
+) {
+  return this.businessService.updateCategory(
+    businessId,
+    categoryId,
+    dto,
+  );
+}
+
+@Delete(':businessId/categories/:categoryId')
+@UseGuards(BusinessMembershipGuard, PermissionsGuard)
+@RequirePermissions('categories.delete')
+deleteCategory(
+  @Param('businessId') businessId: string,
+  @Param('categoryId') categoryId: string,
+) {
+  return this.businessService.deleteCategory(
+    businessId,
+    categoryId,
+  );
+}
 
   @Post(':businessId/customers')
   @UseGuards(BusinessMembershipGuard, PermissionsGuard)

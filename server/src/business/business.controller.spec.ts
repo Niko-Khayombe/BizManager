@@ -17,8 +17,17 @@ describe('BusinessController', () => {
     findMembers: vi.fn(),
     addMember: vi.fn(),
     createCustomer: vi.fn(),
+    createProduct: vi.fn(),
     findCustomers: vi.fn(),
     findCustomer: vi.fn(),
+    findCategories: vi.fn(),
+    findCategory: vi.fn(),
+    findProducts: vi.fn(),
+    findProduct: vi.fn(),
+    updateCategory: vi.fn(),
+    updateProduct: vi.fn(),
+    deleteCategory: vi.fn(),
+    deleteProduct: vi.fn(),
     updateCustomer: vi.fn(),
     deleteCustomer: vi.fn(),
     createRole: vi.fn(),
@@ -28,6 +37,7 @@ describe('BusinessController', () => {
     removeMember: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
+    createCategory: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -515,4 +525,377 @@ describe('BusinessController', () => {
       expect(requiredPermissions).toEqual(['customers.read']);
     });
   });
+
+  describe('createProduct', () => {
+  it('should create a product for the specified business', async () => {
+    const dto = {
+      name: 'Laptop',
+      sku: 'LAP-001',
+      sellingPrice: 75000,
+    };
+
+    const expectedResult = {
+      message: 'Product created successfully.',
+      product: { id: 'product-123', ...dto },
+    };
+
+    mockBusinessService.createProduct.mockResolvedValue(
+      expectedResult,
+    );
+
+    const result = await controller.createProduct(
+      'business-123',
+      dto,
+    );
+
+    expect(mockBusinessService.createProduct).toHaveBeenCalledWith(
+      'business-123',
+      dto,
+    );
+    expect(result).toEqual(expectedResult);
+  });
+
+  it('should require products.create permission', () => {
+    const permissions = Reflect.getMetadata(
+      'required_permissions',
+      BusinessController.prototype.createProduct,
+    );
+
+    expect(permissions).toContain('products.create');
+  });
+});
+
+describe('findProducts', () => {
+  it('should retrieve products for the specified business', async () => {
+    const fakeProducts = [
+      {
+        id: 'product-123',
+        name: 'Laptop',
+        sku: 'LAP-001',
+      },
+    ];
+
+    mockBusinessService.findProducts.mockResolvedValue(
+      fakeProducts,
+    );
+
+    const result = await controller.findProducts(
+      'business-123',
+    );
+
+    expect(mockBusinessService.findProducts).toHaveBeenCalledWith(
+      'business-123',
+    );
+
+    expect(result).toEqual(fakeProducts);
+  });
+
+  it('should require products.read permission', () => {
+    const permissions = Reflect.getMetadata(
+      'required_permissions',
+      BusinessController.prototype.findProducts,
+    );
+
+    expect(permissions).toContain('products.read');
+  });
+});
+
+describe('findProduct', () => {
+  it('should retrieve a product for the specified business', async () => {
+    const fakeProduct = {
+      id: 'product-123',
+      name: 'Laptop',
+      sku: 'LAP-001',
+    };
+
+    mockBusinessService.findProduct.mockResolvedValue(fakeProduct);
+
+    const result = await controller.findProduct(
+      'business-123',
+      'product-123',
+    );
+
+    expect(mockBusinessService.findProduct).toHaveBeenCalledWith(
+      'business-123',
+      'product-123',
+    );
+
+    expect(result).toEqual(fakeProduct);
+  });
+
+  it('should require products.read permission', () => {
+    const permissions = Reflect.getMetadata(
+      'required_permissions',
+      BusinessController.prototype.findProduct,
+    );
+
+    expect(permissions).toContain('products.read');
+  });
+});
+
+describe('updateProduct', () => {
+  it('should update a product for the specified business', async () => {
+    const dto = {
+      name: 'Updated Laptop',
+      sellingPrice: 65000,
+    };
+
+    const expectedResult = {
+      message: 'Product updated successfully.',
+      product: {
+        id: 'product-123',
+        ...dto,
+      },
+    };
+
+    mockBusinessService.updateProduct.mockResolvedValue(
+      expectedResult,
+    );
+
+    const result = await controller.updateProduct(
+      'business-123',
+      'product-123',
+      dto,
+    );
+
+    expect(mockBusinessService.updateProduct).toHaveBeenCalledWith(
+      'business-123',
+      'product-123',
+      dto,
+    );
+
+    expect(result).toEqual(expectedResult);
+  });
+
+  it('should require products.update permission', () => {
+    const permissions = Reflect.getMetadata(
+      'required_permissions',
+      BusinessController.prototype.updateProduct,
+    );
+
+    expect(permissions).toContain('products.update');
+  });
+});
+
+describe('deleteProduct', () => {
+  it('should delete a product for the specified business', async () => {
+    const expectedResult = {
+      message: 'Product deleted successfully.',
+    };
+
+    mockBusinessService.deleteProduct.mockResolvedValue(
+      expectedResult,
+    );
+
+    const result = await controller.deleteProduct(
+      'business-123',
+      'product-123',
+    );
+
+    expect(mockBusinessService.deleteProduct).toHaveBeenCalledWith(
+      'business-123',
+      'product-123',
+    );
+
+    expect(result).toEqual(expectedResult);
+  });
+
+  it('should require products.delete permission', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      BusinessController.prototype.deleteProduct,
+    );
+
+    expect(permissions).toEqual(['products.delete']);
+  });
+});
+
+  describe('createCategory', () => {
+  it('should create a category for the specified business', async () => {
+    const dto = {
+      name: 'Electronics',
+      description: 'Electronic products',
+    };
+
+    const fakeResult = {
+      message: 'Category created successfully.',
+      category: {
+        id: 'category-123',
+        businessId: 'business-123',
+        ...dto,
+      },
+    };
+
+    mockBusinessService.createCategory.mockResolvedValue(fakeResult);
+
+    const result = await controller.createCategory(
+      'business-123',
+      dto,
+    );
+
+    expect(mockBusinessService.createCategory).toHaveBeenCalledWith(
+      'business-123',
+      dto,
+    );
+
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should require the categories.create permission', () => {
+    const requiredPermissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      BusinessController.prototype.createCategory,
+    );
+
+    expect(requiredPermissions).toEqual(['categories.create']);
+  });
+});
+  describe('findCategories', () => {
+    it('should return categories for the specified business', async () => {
+      const fakeCategories = [
+        {
+          id: 'category-123',
+          businessId: 'business-123',
+          name: 'Electronics',
+        },
+        {
+          id: 'category-456',
+          businessId: 'business-123',
+          name: 'Furniture',
+        },
+      ];
+
+      mockBusinessService.findCategories.mockResolvedValue(
+        fakeCategories,
+      );
+
+      const result = await controller.findCategories(
+        'business-123',
+      );
+
+      expect(
+        mockBusinessService.findCategories,
+      ).toHaveBeenCalledWith('business-123');
+
+      expect(result).toEqual(fakeCategories);
+    });
+
+    it('should require the categories.read permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findCategories,
+      );
+
+      expect(requiredPermissions).toEqual(['categories.read']);
+    });
+  });
+
+    describe('findCategory', () => {
+    it('should retrieve a category for the specified business', async () => {
+      const fakeCategory = {
+        id: 'category-123',
+        businessId: 'business-123',
+        name: 'Electronics',
+        description: 'Electronic products',
+      };
+
+      mockBusinessService.findCategory.mockResolvedValue(fakeCategory);
+
+      const result = await controller.findCategory(
+        'business-123',
+        'category-123',
+      );
+
+      expect(mockBusinessService.findCategory).toHaveBeenCalledWith(
+        'business-123',
+        'category-123',
+      );
+
+      expect(result).toEqual(fakeCategory);
+    });
+
+    it('should require the categories.read permission', () => {
+      const requiredPermissions = Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        BusinessController.prototype.findCategory,
+      );
+
+      expect(requiredPermissions).toEqual(['categories.read']);
+    });
+  });
+
+  describe('updateCategory', () => {
+  it('should update a category for the specified business', async () => {
+    const dto = {
+      name: 'Computers',
+      description: 'Computer accessories',
+    };
+
+    const fakeResult = {
+      message: 'Category updated successfully.',
+      category: {
+        id: 'category-123',
+        businessId: 'business-123',
+        name: 'Computers',
+        description: 'Computer accessories',
+      },
+    };
+
+    mockBusinessService.updateCategory.mockResolvedValue(fakeResult);
+
+    const result = await controller.updateCategory(
+      'business-123',
+      'category-123',
+      dto,
+    );
+
+    expect(mockBusinessService.updateCategory).toHaveBeenCalledWith(
+      'business-123',
+      'category-123',
+      dto,
+    );
+
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should require the categories.update permission', () => {
+    const requiredPermissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      BusinessController.prototype.updateCategory,
+    );
+
+    expect(requiredPermissions).toEqual(['categories.update']);
+  });
+});
+
+describe('deleteCategory', () => {
+  it('should delete a category from the specified business', async () => {
+    const fakeResult = {
+      message: 'Category deleted successfully.',
+    };
+
+    mockBusinessService.deleteCategory.mockResolvedValue(fakeResult);
+
+    const result = await controller.deleteCategory(
+      'business-123',
+      'category-123',
+    );
+
+    expect(mockBusinessService.deleteCategory).toHaveBeenCalledWith(
+      'business-123',
+      'category-123',
+    );
+
+    expect(result).toEqual(fakeResult);
+  });
+
+  it('should require the categories.delete permission', () => {
+    const requiredPermissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      BusinessController.prototype.deleteCategory,
+    );
+
+    expect(requiredPermissions).toEqual(['categories.delete']);
+  });
+});
 });

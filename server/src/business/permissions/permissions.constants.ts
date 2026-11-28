@@ -14,6 +14,11 @@ export const SYSTEM_PERMISSIONS = [
   { key: 'customers.update', name: 'Update customers' },
   { key: 'customers.delete', name: 'Delete customers' },
 
+  { key: 'categories.create', name: 'Create categories' },
+  { key: 'categories.read', name: 'View categories' },
+  { key: 'categories.update', name: 'Update categories' },
+  { key: 'categories.delete', name: 'Delete categories' },
+
   { key: 'products.create', name: 'Create products' },
   { key: 'products.read', name: 'View products' },
   { key: 'products.update', name: 'Update products' },

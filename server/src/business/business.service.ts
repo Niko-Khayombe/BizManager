@@ -1,3 +1,7 @@
+import { UpdateProductDto } from './dto/update-product.dto.js';
+import { CreateProductDto } from './dto/create-product.dto.js';
+import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 import { Prisma } from '@prisma/client';
@@ -597,6 +601,416 @@ async removeMember(
   });
 }
 
+async createProduct(
+  businessId: string,
+  dto: CreateProductDto,
+) {
+  const name = dto.name.trim();
+  const sku = dto.sku.trim().toUpperCase();
+  const categoryId = dto.categoryId?.trim();
+
+  if (!name) {
+    throw new BadRequestException(
+      'Product name cannot be empty.',
+    );
+  }
+
+  if (!sku) {
+    throw new BadRequestException(
+      'Product SKU cannot be empty.',
+    );
+  }
+
+  if (categoryId) {
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        businessId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!category) {
+      throw new BadRequestException(
+        'Category does not belong to this business.',
+      );
+    }
+  }
+
+  try {
+    const product = await this.prisma.product.create({
+      data: {
+        businessId,
+        categoryId: categoryId || null,
+        name,
+        description: dto.description?.trim() || null,
+        sku,
+        barcode: dto.barcode?.trim() || null,
+        costPrice: dto.costPrice ?? 0,
+        sellingPrice: dto.sellingPrice,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    return {
+      message: 'Product created successfully.',
+      product,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A product with this SKU already exists in this business.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async findProducts(businessId: string) {
+  return this.prisma.product.findMany({
+    where: {
+      businessId,
+    },
+    include: {
+      category: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+}
+
+async findProduct(
+  businessId: string,
+  productId: string,
+) {
+  const product = await this.prisma.product.findFirst({
+    where: {
+      id: productId,
+      businessId,
+    },
+    include: {
+      category: true,
+    },
+  });
+
+  if (!product) {
+    throw new NotFoundException(
+      'Product not found in this business.',
+    );
+  }
+
+  return product;
+}
+
+async updateProduct(
+  businessId: string,
+  productId: string,
+  dto: UpdateProductDto,
+) {
+  const existingProduct = await this.prisma.product.findFirst({
+    where: {
+      id: productId,
+      businessId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingProduct) {
+    throw new NotFoundException(
+      'Product not found in this business.',
+    );
+  }
+
+  const data: Prisma.ProductUpdateInput = {};
+
+  if (dto.name !== undefined) {
+    const name = dto.name.trim();
+
+    if (!name) {
+      throw new BadRequestException(
+        'Product name cannot be empty.',
+      );
+    }
+
+    data.name = name;
+  }
+
+  if (dto.description !== undefined) {
+    data.description = dto.description.trim() || null;
+  }
+
+  if (dto.sku !== undefined) {
+    const sku = dto.sku.trim().toUpperCase();
+
+    if (!sku) {
+      throw new BadRequestException(
+        'Product SKU cannot be empty.',
+      );
+    }
+
+    data.sku = sku;
+  }
+
+  if (dto.barcode !== undefined) {
+    data.barcode = dto.barcode.trim() || null;
+  }
+
+  if (dto.costPrice !== undefined) {
+    data.costPrice = dto.costPrice;
+  }
+
+  if (dto.sellingPrice !== undefined) {
+    data.sellingPrice = dto.sellingPrice;
+  }
+
+  if (dto.isActive !== undefined) {
+    data.isActive = dto.isActive;
+  }
+
+  if (dto.categoryId !== undefined) {
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: dto.categoryId,
+        businessId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!category) {
+      throw new BadRequestException(
+        'Category does not belong to this business.',
+      );
+    }
+
+    data.category = {
+      connect: {
+        id: category.id,
+      },
+    };
+  }
+
+  try {
+    const product = await this.prisma.product.update({
+      where: {
+        id: productId,
+      },
+      data,
+      include: {
+        category: true,
+      },
+    });
+
+    return {
+      message: 'Product updated successfully.',
+      product,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A product with this SKU already exists in this business.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async deleteProduct(
+  businessId: string,
+  productId: string,
+) {
+  const result = await this.prisma.product.deleteMany({
+    where: {
+      id: productId,
+      businessId,
+    },
+  });
+
+  if (result.count === 0) {
+    throw new NotFoundException(
+      'Product not found in this business.',
+    );
+  }
+
+  return {
+    message: 'Product deleted successfully.',
+  };
+}
+
+async createCategory(
+  businessId: string,
+  dto: CreateCategoryDto,
+) {
+  const name = dto.name.trim();
+
+  if (!name) {
+    throw new BadRequestException(
+      'Category name cannot be empty.',
+    );
+  }
+
+  try {
+    const category = await this.prisma.category.create({
+      data: {
+        businessId,
+        name,
+        description: dto.description?.trim() || null,
+      },
+    });
+
+    return {
+      message: 'Category created successfully.',
+      category,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A category with this name already exists in this business.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async findCategories(businessId: string) {
+  return this.prisma.category.findMany({
+    where: {
+      businessId,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+}
+
+async findCategory(
+  businessId: string,
+  categoryId: string,
+) {
+  const category = await this.prisma.category.findFirst({
+    where: {
+      id: categoryId,
+      businessId,
+    },
+  });
+
+  if (!category) {
+    throw new NotFoundException(
+      'Category not found in this business.',
+    );
+  }
+
+  return category;
+}
+
+async updateCategory(
+  businessId: string,
+  categoryId: string,
+  dto: UpdateCategoryDto,
+) {
+  const existingCategory = await this.prisma.category.findFirst({
+    where: {
+      id: categoryId,
+      businessId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingCategory) {
+    throw new NotFoundException(
+      'Category not found in this business.',
+    );
+  }
+
+  const data: {
+    name?: string;
+    description?: string | null;
+  } = {};
+
+  if (dto.name !== undefined) {
+    const name = dto.name.trim();
+
+    if (!name) {
+      throw new BadRequestException(
+        'Category name cannot be empty.',
+      );
+    }
+
+    data.name = name;
+  }
+
+  if (dto.description !== undefined) {
+    data.description = dto.description.trim() || null;
+  }
+
+  try {
+    const category = await this.prisma.category.update({
+      where: {
+        id: existingCategory.id,
+      },
+      data,
+    });
+
+    return {
+      message: 'Category updated successfully.',
+      category,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A category with this name already exists in this business.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async deleteCategory(
+  businessId: string,
+  categoryId: string,
+) {
+  const result = await this.prisma.category.deleteMany({
+    where: {
+      id: categoryId,
+      businessId,
+    },
+  });
+
+  if (result.count === 0) {
+    throw new NotFoundException(
+      'Category not found in this business.',
+    );
+  }
+
+  return {
+    message: 'Category deleted successfully.',
+  };
+}
+
 async createCustomer(
   businessId: string,
   dto: CreateCustomerDto,
@@ -608,6 +1022,7 @@ async createCustomer(
       'Customer name cannot be empty.',
     );
   }
+
 
   const customer = await this.prisma.customer.create({
     data: {

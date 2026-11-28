@@ -158,6 +158,20 @@ describe('BusinessService', () => {
      findFirst: vi.fn(),
      update: vi.fn(),
     },
+    category: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    product: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     role: {
       findMany: vi.fn(),
     },
@@ -185,6 +199,615 @@ describe('BusinessService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('createProduct', () => {
+  it('should create a product with normalized details and default values', async () => {
+    const dto = {
+      name: '  Laptop  ',
+      description: '  Business laptop  ',
+      sku: '  lap-001  ',
+      barcode: '  123456789  ',
+      sellingPrice: 75000,
+      categoryId: 'category-123',
+    };
+
+    const fakeProduct = {
+      id: 'product-123',
+      businessId: 'business-123',
+      categoryId: 'category-123',
+      name: 'Laptop',
+      description: 'Business laptop',
+      sku: 'LAP-001',
+      barcode: '123456789',
+      costPrice: 0,
+      sellingPrice: 75000,
+      isActive: true,
+    };
+
+    mockPrisma.category.findFirst.mockResolvedValue({
+      id: 'category-123',
+    });
+
+    mockPrisma.product.create.mockResolvedValue(fakeProduct);
+
+    const result = await service.createProduct(
+      'business-123',
+      dto,
+    );
+
+    expect(mockPrisma.category.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'category-123',
+        businessId: 'business-123',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    expect(mockPrisma.product.create).toHaveBeenCalledWith({
+      data: {
+        businessId: 'business-123',
+        categoryId: 'category-123',
+        name: 'Laptop',
+        description: 'Business laptop',
+        sku: 'LAP-001',
+        barcode: '123456789',
+        costPrice: 0,
+        sellingPrice: 75000,
+        isActive: true,
+      },
+    });
+
+    expect(result.product).toEqual(fakeProduct);
+    expect(result.message).toBe('Product created successfully.');
+  });
+
+  it('should reject a category that does not belong to the business', async () => {
+    mockPrisma.category.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.createProduct('business-123', {
+        name: 'Laptop',
+        sku: 'LAP-001',
+        sellingPrice: 75000,
+        categoryId: 'other-category',
+      }),
+    ).rejects.toThrow(
+      'Category does not belong to this business.',
+    );
+
+    expect(mockPrisma.product.create).not.toHaveBeenCalled();
+  });
+
+  it('should reject an empty product name', async () => {
+    await expect(
+      service.createProduct('business-123', {
+        name: '   ',
+        sku: 'LAP-001',
+        sellingPrice: 75000,
+      }),
+    ).rejects.toThrow('Product name cannot be empty.');
+
+    expect(mockPrisma.product.create).not.toHaveBeenCalled();
+  });
+
+  it('should reject an empty product SKU', async () => {
+    await expect(
+      service.createProduct('business-123', {
+        name: 'Laptop',
+        sku: '   ',
+        sellingPrice: 75000,
+      }),
+    ).rejects.toThrow('Product SKU cannot be empty.');
+
+    expect(mockPrisma.product.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('findProducts', () => {
+  it('should return products belonging to the specified business', async () => {
+    const fakeProducts = [
+      {
+        id: 'product-123',
+        businessId: 'business-123',
+        name: 'Laptop',
+        sku: 'LAP-001',
+      },
+      {
+        id: 'product-456',
+        businessId: 'business-123',
+        name: 'Mouse',
+        sku: 'MOU-001',
+      },
+    ];
+
+    mockPrisma.product.findMany.mockResolvedValue(fakeProducts);
+
+    const result = await service.findProducts('business-123');
+
+    expect(mockPrisma.product.findMany).toHaveBeenCalledWith({
+      where: {
+        businessId: 'business-123',
+      },
+      include: {
+        category: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    expect(result).toEqual(fakeProducts);
+  });
+
+  it('should return an empty array when no products exist', async () => {
+    mockPrisma.product.findMany.mockResolvedValue([]);
+
+    const result = await service.findProducts('business-123');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('findProduct', () => {
+  it('should retrieve a product belonging to the specified business', async () => {
+    const fakeProduct = {
+      id: 'product-123',
+      businessId: 'business-123',
+      name: 'Laptop',
+      sku: 'LAP-001',
+    };
+
+    mockPrisma.product.findFirst.mockResolvedValue(fakeProduct);
+
+    const result = await service.findProduct(
+      'business-123',
+      'product-123',
+    );
+
+    expect(mockPrisma.product.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'product-123',
+        businessId: 'business-123',
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    expect(result).toEqual(fakeProduct);
+  });
+
+  it('should reject a product belonging to another business or not existing', async () => {
+    mockPrisma.product.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.findProduct('business-123', 'product-456'),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('updateProduct', () => {
+  it('should update a product with normalized details', async () => {
+    const dto = {
+      name: '  Updated Laptop  ',
+      sku: ' lap-002 ',
+      description: '  Updated description  ',
+      barcode: '  BAR123  ',
+      costPrice: 50000,
+      sellingPrice: 65000,
+      isActive: false,
+    };
+
+    const fakeProduct = {
+      id: 'product-123',
+      name: 'Updated Laptop',
+      sku: 'LAP-002',
+    };
+
+    mockPrisma.product.findFirst.mockResolvedValue({
+      id: 'product-123',
+    });
+
+    mockPrisma.product.update.mockResolvedValue(fakeProduct);
+
+    const result = await service.updateProduct(
+      'business-123',
+      'product-123',
+      dto,
+    );
+
+    expect(mockPrisma.product.update).toHaveBeenCalledWith({
+      where: {
+        id: 'product-123',
+      },
+      data: {
+        name: 'Updated Laptop',
+        sku: 'LAP-002',
+        description: 'Updated description',
+        barcode: 'BAR123',
+        costPrice: 50000,
+        sellingPrice: 65000,
+        isActive: false,
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    expect(result.product).toEqual(fakeProduct);
+    expect(result.message).toBe('Product updated successfully.');
+  });
+
+  it('should reject a product not belonging to the business', async () => {
+    mockPrisma.product.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateProduct('business-123', 'product-456', {
+        name: 'Updated Laptop',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockPrisma.product.update).not.toHaveBeenCalled();
+  });
+
+  it('should reject an empty product name', async () => {
+    mockPrisma.product.findFirst.mockResolvedValue({
+      id: 'product-123',
+    });
+
+    await expect(
+      service.updateProduct('business-123', 'product-123', {
+        name: '   ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject an empty product SKU', async () => {
+    mockPrisma.product.findFirst.mockResolvedValue({
+      id: 'product-123',
+    });
+
+    await expect(
+      service.updateProduct('business-123', 'product-123', {
+        sku: '   ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject a category belonging to another business', async () => {
+    mockPrisma.product.findFirst.mockResolvedValue({
+      id: 'product-123',
+    });
+
+    mockPrisma.category.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateProduct('business-123', 'product-123', {
+        categoryId: 'category-456',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.product.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteProduct', () => {
+  it('should delete a product belonging to the business', async () => {
+    mockPrisma.product.deleteMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const result = await service.deleteProduct(
+      'business-123',
+      'product-123',
+    );
+
+    expect(mockPrisma.product.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'product-123',
+        businessId: 'business-123',
+      },
+    });
+
+    expect(result).toEqual({
+      message: 'Product deleted successfully.',
+    });
+  });
+
+  it('should reject a product not belonging to the business', async () => {
+    mockPrisma.product.deleteMany.mockResolvedValue({
+      count: 0,
+    });
+
+    await expect(
+      service.deleteProduct('business-123', 'product-456'),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
+    describe('createCategory', () => {
+    it('should create a category with normalized details', async () => {
+      const dto = {
+        name: '  Electronics  ',
+        description: '  Electronic products  ',
+      };
+
+      const fakeCategory = {
+        id: 'category-123',
+        businessId: 'business-123',
+        name: 'Electronics',
+        description: 'Electronic products',
+      };
+
+      mockPrisma.category.create.mockResolvedValue(fakeCategory);
+
+      const result = await service.createCategory(
+        'business-123',
+        dto,
+      );
+
+      expect(mockPrisma.category.create).toHaveBeenCalledWith({
+        data: {
+          businessId: 'business-123',
+          name: 'Electronics',
+          description: 'Electronic products',
+        },
+      });
+
+      expect(result.category).toEqual(fakeCategory);
+      expect(result.message).toBe('Category created successfully.');
+    });
+
+    it('should reject an empty category name', async () => {
+      await expect(
+        service.createCategory('business-123', {
+          name: '   ',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrisma.category.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject duplicate category names', async () => {
+      const duplicateError =
+        new Prisma.PrismaClientKnownRequestError(
+          'Unique constraint failed',
+          {
+            code: 'P2002',
+            clientVersion: '6.19.3',
+            meta: {
+              target: ['businessId', 'name'],
+            },
+          },
+        );
+
+      mockPrisma.category.create.mockRejectedValue(duplicateError);
+
+      await expect(
+        service.createCategory('business-123', {
+          name: 'Electronics',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+    describe('findCategories', () => {
+    it('should return categories belonging to the specified business', async () => {
+      const fakeCategories = [
+        {
+          id: 'category-123',
+          businessId: 'business-123',
+          name: 'Electronics',
+          description: 'Electronic products',
+        },
+        {
+          id: 'category-456',
+          businessId: 'business-123',
+          name: 'Furniture',
+          description: 'Home furniture',
+        },
+      ];
+
+      mockPrisma.category.findMany.mockResolvedValue(fakeCategories);
+
+      const result = await service.findCategories('business-123');
+
+      expect(mockPrisma.category.findMany).toHaveBeenCalledWith({
+        where: {
+          businessId: 'business-123',
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      });
+
+      expect(result).toEqual(fakeCategories);
+    });
+
+    it('should return an empty array when no categories exist', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([]);
+
+      const result = await service.findCategories('business-123');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+    describe('findCategory', () => {
+    it('should retrieve a category belonging to the specified business', async () => {
+      const fakeCategory = {
+        id: 'category-123',
+        businessId: 'business-123',
+        name: 'Electronics',
+        description: 'Electronic products',
+      };
+
+      mockPrisma.category.findFirst.mockResolvedValue(fakeCategory);
+
+      const result = await service.findCategory(
+        'business-123',
+        'category-123',
+      );
+
+      expect(mockPrisma.category.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'category-123',
+          businessId: 'business-123',
+        },
+      });
+
+      expect(result).toEqual(fakeCategory);
+    });
+
+    it('should reject a category belonging to another business or not existing', async () => {
+      mockPrisma.category.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.findCategory('business-123', 'category-456'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateCategory', () => {
+  it('should update a category with normalized details', async () => {
+    const fakeCategory = {
+      id: 'category-123',
+      businessId: 'business-123',
+      name: 'Computers',
+      description: 'Computer accessories',
+    };
+
+    mockPrisma.category.findFirst.mockResolvedValue({
+      id: 'category-123',
+    });
+
+    mockPrisma.category.update.mockResolvedValue(fakeCategory);
+
+    const result = await service.updateCategory(
+      'business-123',
+      'category-123',
+      {
+        name: '  Computers  ',
+        description: '  Computer accessories  ',
+      },
+    );
+
+    expect(mockPrisma.category.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'category-123',
+        businessId: 'business-123',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    expect(mockPrisma.category.update).toHaveBeenCalledWith({
+      where: {
+        id: 'category-123',
+      },
+      data: {
+        name: 'Computers',
+        description: 'Computer accessories',
+      },
+    });
+
+    expect(result.category).toEqual(fakeCategory);
+    expect(result.message).toBe('Category updated successfully.');
+  });
+
+  it('should reject a category that does not belong to the business', async () => {
+    mockPrisma.category.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateCategory('business-123', 'category-456', {
+        name: 'Computers',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockPrisma.category.update).not.toHaveBeenCalled();
+  });
+
+  it('should reject an empty category name', async () => {
+    mockPrisma.category.findFirst.mockResolvedValue({
+      id: 'category-123',
+    });
+
+    await expect(
+      service.updateCategory('business-123', 'category-123', {
+        name: '   ',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockPrisma.category.update).not.toHaveBeenCalled();
+  });
+
+  it('should allow clearing the category description', async () => {
+    mockPrisma.category.findFirst.mockResolvedValue({
+      id: 'category-123',
+    });
+
+    mockPrisma.category.update.mockResolvedValue({
+      id: 'category-123',
+      businessId: 'business-123',
+      name: 'Electronics',
+      description: null,
+    });
+
+    await service.updateCategory(
+      'business-123',
+      'category-123',
+      {
+        description: '   ',
+      },
+    );
+
+    expect(mockPrisma.category.update).toHaveBeenCalledWith({
+      where: {
+        id: 'category-123',
+      },
+      data: {
+        description: null,
+      },
+    });
+  });
+});
+
+describe('deleteCategory', () => {
+  it('should delete a category belonging to the specified business', async () => {
+    mockPrisma.category.deleteMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const result = await service.deleteCategory(
+      'business-123',
+      'category-123',
+    );
+
+    expect(mockPrisma.category.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'category-123',
+        businessId: 'business-123',
+      },
+    });
+
+    expect(result).toEqual({
+      message: 'Category deleted successfully.',
+    });
+  });
+
+  it('should reject a category not found in the specified business', async () => {
+    mockPrisma.category.deleteMany.mockResolvedValue({
+      count: 0,
+    });
+
+    await expect(
+      service.deleteCategory('business-123', 'category-456'),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
 
   describe('createCustomer', () => {
   it('should create a customer with normalized details', async () => {
