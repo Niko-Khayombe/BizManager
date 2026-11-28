@@ -2273,5 +2273,101 @@ for (const role of fakeRoles) {
         }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should transfer stock between locations and record a movement', async () => {
+  const tx = createTransaction();
+
+  mockPrisma.$transaction.mockImplementation(
+    (callback) => callback(tx),
+  );
+
+  const result = await service.transferStock('business-123', {
+    productId: 'product-123',
+    fromLocationId: 'location-123',
+    toLocationId: 'location-456',
+    quantity: 5,
+    reference: 'TRANSFER-001',
+    note: 'Move stock to branch',
+  });
+
+  expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        businessId: 'business-123',
+        productId: 'product-123',
+        locationId: 'location-123',
+        quantity: {
+          gte: new Prisma.Decimal(5),
+        },
+      }),
+      data: {
+        quantity: {
+          decrement: new Prisma.Decimal(5),
+        },
+      },
+    }),
+  );
+
+  expect(tx.productStock.upsert).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: {
+        businessId_productId_locationId: {
+          businessId: 'business-123',
+          productId: 'product-123',
+          locationId: 'location-456',
+        },
+      },
+    }),
+  );
+
+  expect(tx.stockMovement.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      businessId: 'business-123',
+      productId: 'product-123',
+      type: 'TRANSFER',
+      quantity: new Prisma.Decimal(5),
+      fromLocationId: 'location-123',
+      toLocationId: 'location-456',
+      reference: 'TRANSFER-001',
+      note: 'Move stock to branch',
+    }),
+  });
+
+  expect(result.message).toBe('Stock transferred successfully.');
+});
+
+it('should reject transfers between the same location', async () => {
+  await expect(
+    service.transferStock('business-123', {
+      productId: 'product-123',
+      fromLocationId: 'location-123',
+      toLocationId: 'location-123',
+      quantity: 5,
+    }),
+  ).rejects.toThrow(BadRequestException);
+
+  expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+});
+
+it('should reject transfers when source stock is insufficient', async () => {
+  const tx = createTransaction();
+  tx.productStock.updateMany.mockResolvedValue({ count: 0 });
+
+  mockPrisma.$transaction.mockImplementation(
+    (callback) => callback(tx),
+  );
+
+  await expect(
+    service.transferStock('business-123', {
+      productId: 'product-123',
+      fromLocationId: 'location-123',
+      toLocationId: 'location-456',
+      quantity: 50,
+    }),
+  ).rejects.toThrow(BadRequestException);
+
+  expect(tx.productStock.upsert).not.toHaveBeenCalled();
+  expect(tx.stockMovement.create).not.toHaveBeenCalled();
+});
   });
 });

@@ -2,6 +2,7 @@ import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
 import { CreateStockIssueDto } from './dto/create-stock-issue.dto.js';
+import { CreateStockTransferDto } from './dto/create-stock-transfer.dto.js';
 import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
@@ -1607,6 +1608,126 @@ async adjustStock(
 
     throw error;
   }
+}
+
+async transferStock(
+  businessId: string,
+  dto: CreateStockTransferDto,
+) {
+  if (dto.fromLocationId === dto.toLocationId) {
+    throw new BadRequestException(
+      'Source and destination locations must be different.',
+    );
+  }
+
+  return this.prisma.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: {
+        id: dto.productId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        'Active product not found in this business.',
+      );
+    }
+
+    const sourceLocation = await tx.stockLocation.findFirst({
+      where: {
+        id: dto.fromLocationId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!sourceLocation) {
+      throw new NotFoundException(
+        'Active source stock location not found in this business.',
+      );
+    }
+
+    const destinationLocation = await tx.stockLocation.findFirst({
+      where: {
+        id: dto.toLocationId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!destinationLocation) {
+      throw new NotFoundException(
+        'Active destination stock location not found in this business.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(dto.quantity);
+
+    const result = await tx.productStock.updateMany({
+      where: {
+        businessId,
+        productId: dto.productId,
+        locationId: dto.fromLocationId,
+        quantity: {
+          gte: quantity,
+        },
+      },
+      data: {
+        quantity: {
+          decrement: quantity,
+        },
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Insufficient stock at the source location.',
+      );
+    }
+
+    const destinationStock = await tx.productStock.upsert({
+      where: {
+        businessId_productId_locationId: {
+          businessId,
+          productId: dto.productId,
+          locationId: dto.toLocationId,
+        },
+      },
+      create: {
+        businessId,
+        productId: dto.productId,
+        locationId: dto.toLocationId,
+        quantity,
+      },
+      update: {
+        quantity: {
+          increment: quantity,
+        },
+      },
+    });
+
+    const movement = await tx.stockMovement.create({
+      data: {
+        businessId,
+        productId: dto.productId,
+        type: 'TRANSFER',
+        quantity,
+        fromLocationId: dto.fromLocationId,
+        toLocationId: dto.toLocationId,
+        reference: dto.reference?.trim() || null,
+        note: dto.note?.trim() || null,
+      },
+    });
+
+    return {
+      message: 'Stock transferred successfully.',
+      transferredQuantity: quantity,
+      destinationStock,
+      movement,
+    };
+  });
 }
 
 async findOne(businessId: string) {

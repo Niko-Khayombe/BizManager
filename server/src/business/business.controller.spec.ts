@@ -46,6 +46,7 @@ describe('BusinessController', () => {
     receiveStock: vi.fn(),
     issueStock: vi.fn(),
     adjustStock: vi.fn(),
+    transferStock: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -1116,6 +1117,29 @@ describe('deleteCategory', () => {
       expect(result).toEqual(fakeResult);
     });
 
+    it('should transfer stock', async () => {
+    const dto = {
+    productId: 'product-123',
+    fromLocationId: 'location-123',
+    toLocationId: 'location-456',
+    quantity: 5,
+  };
+
+  const fakeResult = {
+    message: 'Stock transferred successfully.',
+  };
+
+  mockBusinessService.transferStock.mockResolvedValue(fakeResult);
+
+  const result = await controller.transferStock('business-123', dto);
+
+  expect(mockBusinessService.transferStock).toHaveBeenCalledWith(
+    'business-123',
+    dto,
+  );
+  expect(result).toEqual(fakeResult);
+});
+
     it('should require the inventory.stock.adjust permission', () => {
       expect(
         Reflect.getMetadata(
@@ -1137,6 +1161,13 @@ describe('deleteCategory', () => {
           BusinessController.prototype.adjustStock,
         ),
       ).toEqual(['inventory.stock.adjust']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.transferStock,
+        ),
+).toEqual(['inventory.stock.transfer']);
     });
   });
 });

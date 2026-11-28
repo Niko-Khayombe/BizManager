@@ -1,6 +1,7 @@
 import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
+import { CreateStockTransferDto } from './dto/create-stock-transfer.dto.js';
 import { CreateStockIssueDto } from './dto/create-stock-issue.dto.js';
 import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
@@ -410,6 +411,16 @@ deleteCategory(
   ) {
     return this.businessService.adjustStock(businessId, dto);
   }
+
+  @Post(':businessId/stock/transfers')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.stock.transfer')
+  transferStock(
+  @Param('businessId') businessId: string,
+  @Body() dto: CreateStockTransferDto,
+) {
+  return this.businessService.transferStock(businessId, dto);
+}
 
   @Get(':businessId')
   @UseGuards(BusinessMembershipGuard, PermissionsGuard)
