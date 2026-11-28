@@ -38,6 +38,11 @@ describe('BusinessController', () => {
     findOne: vi.fn(),
     create: vi.fn(),
     createCategory: vi.fn(),
+    createStockLocation: vi.fn(),
+    findStockLocations: vi.fn(),
+    findStockLocation: vi.fn(),
+    updateStockLocation: vi.fn(),
+    deleteStockLocation: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -898,4 +903,146 @@ describe('deleteCategory', () => {
     expect(requiredPermissions).toEqual(['categories.delete']);
   });
 });
+  describe('stock location endpoints', () => {
+    it('should create a stock location', async () => {
+      const dto = {
+        name: 'Main Warehouse',
+        description: 'Primary storage',
+      };
+
+      const fakeResult = {
+        message: 'Stock location created successfully.',
+        location: {
+          id: 'location-123',
+          name: 'Main Warehouse',
+        },
+      };
+
+      mockBusinessService.createStockLocation.mockResolvedValue(fakeResult);
+
+      const result = await controller.createStockLocation(
+        'business-123',
+        dto,
+      );
+
+      expect(mockBusinessService.createStockLocation).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should list stock locations', async () => {
+      const locations = [
+        { id: 'location-123', name: 'Main Warehouse' },
+      ];
+
+      mockBusinessService.findStockLocations.mockResolvedValue(locations);
+
+      const result = await controller.findStockLocations('business-123');
+
+      expect(mockBusinessService.findStockLocations).toHaveBeenCalledWith(
+        'business-123',
+      );
+      expect(result).toEqual(locations);
+    });
+
+    it('should retrieve one stock location', async () => {
+      const location = {
+        id: 'location-123',
+        name: 'Main Warehouse',
+      };
+
+      mockBusinessService.findStockLocation.mockResolvedValue(location);
+
+      const result = await controller.findStockLocation(
+        'business-123',
+        'location-123',
+      );
+
+      expect(mockBusinessService.findStockLocation).toHaveBeenCalledWith(
+        'business-123',
+        'location-123',
+      );
+      expect(result).toEqual(location);
+    });
+
+    it('should update a stock location', async () => {
+      const dto = { name: 'Updated Warehouse' };
+      const fakeResult = {
+        message: 'Stock location updated successfully.',
+      };
+
+      mockBusinessService.updateStockLocation.mockResolvedValue(fakeResult);
+
+      const result = await controller.updateStockLocation(
+        'business-123',
+        'location-123',
+        dto,
+      );
+
+      expect(mockBusinessService.updateStockLocation).toHaveBeenCalledWith(
+        'business-123',
+        'location-123',
+        dto,
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should delete a stock location', async () => {
+      const fakeResult = {
+        message: 'Stock location deleted successfully.',
+      };
+
+      mockBusinessService.deleteStockLocation.mockResolvedValue(fakeResult);
+
+      const result = await controller.deleteStockLocation(
+        'business-123',
+        'location-123',
+      );
+
+      expect(mockBusinessService.deleteStockLocation).toHaveBeenCalledWith(
+        'business-123',
+        'location-123',
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the correct permissions', () => {
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.createStockLocation,
+        ),
+      ).toEqual(['inventory.locations.create']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.findStockLocations,
+        ),
+      ).toEqual(['inventory.locations.read']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.findStockLocation,
+        ),
+      ).toEqual(['inventory.locations.read']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.updateStockLocation,
+        ),
+      ).toEqual(['inventory.locations.update']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.deleteStockLocation,
+        ),
+      ).toEqual(['inventory.locations.delete']);
+    });
+  });
 });

@@ -1,3 +1,5 @@
+import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
+import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
@@ -1155,6 +1157,178 @@ async deleteCustomer(
 
   return {
     message: 'Customer deleted successfully.',
+  };
+}
+
+async createStockLocation(
+  businessId: string,
+  dto: CreateStockLocationDto,
+) {
+  const name = dto.name.trim();
+
+  if (!name) {
+    throw new BadRequestException(
+      'Stock location name cannot be empty.',
+    );
+  }
+
+  try {
+    const location = await this.prisma.stockLocation.create({
+      data: {
+        businessId,
+        name,
+        description: dto.description?.trim() || null,
+      },
+    });
+
+    return {
+      message: 'Stock location created successfully.',
+      location,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A stock location with this name already exists.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async findStockLocations(businessId: string) {
+  return this.prisma.stockLocation.findMany({
+    where: { businessId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+async findStockLocation(
+  businessId: string,
+  locationId: string,
+) {
+  const location = await this.prisma.stockLocation.findFirst({
+    where: {
+      id: locationId,
+      businessId,
+    },
+  });
+
+  if (!location) {
+    throw new NotFoundException(
+      'Stock location not found in this business.',
+    );
+  }
+
+  return location;
+}
+
+async updateStockLocation(
+  businessId: string,
+  locationId: string,
+  dto: UpdateStockLocationDto,
+) {
+  const existingLocation = await this.findStockLocation(
+    businessId,
+    locationId,
+  );
+
+  const data: {
+    name?: string;
+    description?: string | null;
+    isActive?: boolean;
+  } = {};
+
+  if (dto.name !== undefined) {
+    const name = dto.name.trim();
+
+    if (!name) {
+      throw new BadRequestException(
+        'Stock location name cannot be empty.',
+      );
+    }
+
+    data.name = name;
+  }
+
+  if (dto.description !== undefined) {
+    data.description = dto.description.trim() || null;
+  }
+
+  if (dto.isActive !== undefined) {
+    data.isActive = dto.isActive;
+  }
+
+  try {
+    const location = await this.prisma.stockLocation.update({
+      where: {
+        id: existingLocation.id,
+      },
+      data,
+    });
+
+    return {
+      message: 'Stock location updated successfully.',
+      location,
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException(
+        'A stock location with this name already exists.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+async deleteStockLocation(
+  businessId: string,
+  locationId: string,
+) {
+  const location = await this.findStockLocation(
+    businessId,
+    locationId,
+  );
+
+  const [stockCount, movementCount] = await Promise.all([
+    this.prisma.productStock.count({
+      where: {
+        businessId,
+        locationId,
+      },
+    }),
+    this.prisma.stockMovement.count({
+      where: {
+        businessId,
+        OR: [
+          { fromLocationId: locationId },
+          { toLocationId: locationId },
+        ],
+      },
+    }),
+  ]);
+
+  if (stockCount > 0 || movementCount > 0) {
+    throw new ConflictException(
+      'This location cannot be deleted because it has stock records or movement history. Deactivate it instead.',
+    );
+  }
+
+  await this.prisma.stockLocation.delete({
+    where: {
+      id: location.id,
+    },
+  });
+
+  return {
+    message: 'Stock location deleted successfully.',
   };
 }
 

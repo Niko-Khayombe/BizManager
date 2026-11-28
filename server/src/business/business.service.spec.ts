@@ -178,6 +178,19 @@ describe('BusinessService', () => {
     business: {
       findUnique: vi.fn(),
     },
+    stockLocation: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    productStock: {
+      count: vi.fn(),
+    },
+    stockMovement: {
+      count: vi.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -1867,6 +1880,186 @@ for (const role of fakeRoles) {
           permissions: ['sales.read'],
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+    describe('stock location management', () => {
+    it('should create a stock location with trimmed details', async () => {
+      const dto = {
+        name: ' Main Warehouse ',
+        description: '  Primary storage  ',
+      };
+
+      const fakeLocation = {
+        id: 'location-123',
+        businessId: 'business-123',
+        name: 'Main Warehouse',
+        description: 'Primary storage',
+      };
+
+      mockPrisma.stockLocation.create.mockResolvedValue(fakeLocation);
+
+      const result = await service.createStockLocation(
+        'business-123',
+        dto,
+      );
+
+      expect(mockPrisma.stockLocation.create).toHaveBeenCalledWith({
+        data: {
+          businessId: 'business-123',
+          name: 'Main Warehouse',
+          description: 'Primary storage',
+        },
+      });
+
+      expect(result.location).toEqual(fakeLocation);
+      expect(result.message).toBe(
+        'Stock location created successfully.',
+      );
+    });
+
+    it('should reject an empty stock location name', async () => {
+      await expect(
+        service.createStockLocation('business-123', {
+          name: '   ',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrisma.stockLocation.create).not.toHaveBeenCalled();
+    });
+
+    it('should list stock locations belonging to a business', async () => {
+      const locations = [
+        {
+          id: 'location-123',
+          businessId: 'business-123',
+          name: 'Main Warehouse',
+        },
+      ];
+
+      mockPrisma.stockLocation.findMany.mockResolvedValue(locations);
+
+      const result = await service.findStockLocations('business-123');
+
+      expect(mockPrisma.stockLocation.findMany).toHaveBeenCalledWith({
+        where: { businessId: 'business-123' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      expect(result).toEqual(locations);
+    });
+
+        it('should find a stock location belonging to a business', async () => {
+      const location = {
+        id: 'location-123',
+        businessId: 'business-123',
+        name: 'Main Warehouse',
+      };
+
+      mockPrisma.stockLocation.findFirst.mockResolvedValue(location);
+
+      const result = await service.findStockLocation(
+        'business-123',
+        'location-123',
+      );
+
+      expect(mockPrisma.stockLocation.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'location-123',
+          businessId: 'business-123',
+        },
+      });
+
+      expect(result).toEqual(location);
+    });
+
+    it('should reject when a stock location does not exist', async () => {
+      mockPrisma.stockLocation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.findStockLocation('business-123', 'missing-location'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update a stock location', async () => {
+      const existingLocation = {
+        id: 'location-123',
+        businessId: 'business-123',
+        name: 'Old Warehouse',
+      };
+
+      const updatedLocation = {
+        ...existingLocation,
+        name: 'New Warehouse',
+        description: 'Updated storage',
+        isActive: false,
+      };
+
+      mockPrisma.stockLocation.findFirst.mockResolvedValue(existingLocation);
+      mockPrisma.stockLocation.update.mockResolvedValue(updatedLocation);
+
+      const result = await service.updateStockLocation(
+        'business-123',
+        'location-123',
+        {
+          name: ' New Warehouse ',
+          description: ' Updated storage ',
+          isActive: false,
+        },
+      );
+
+      expect(mockPrisma.stockLocation.update).toHaveBeenCalledWith({
+        where: { id: 'location-123' },
+        data: {
+          name: 'New Warehouse',
+          description: 'Updated storage',
+          isActive: false,
+        },
+      });
+
+      expect(result.location).toEqual(updatedLocation);
+    });
+
+    it('should delete an unused stock location', async () => {
+      mockPrisma.stockLocation.findFirst.mockResolvedValue({
+        id: 'location-123',
+        businessId: 'business-123',
+        name: 'Main Warehouse',
+      });
+
+      mockPrisma.productStock.count.mockResolvedValue(0);
+      mockPrisma.stockMovement.count.mockResolvedValue(0);
+      mockPrisma.stockLocation.delete.mockResolvedValue({});
+
+      const result = await service.deleteStockLocation(
+        'business-123',
+        'location-123',
+      );
+
+      expect(mockPrisma.stockLocation.delete).toHaveBeenCalledWith({
+        where: { id: 'location-123' },
+      });
+
+      expect(result.message).toBe(
+        'Stock location deleted successfully.',
+      );
+    });
+
+    it('should prevent deleting a location with stock records', async () => {
+      mockPrisma.stockLocation.findFirst.mockResolvedValue({
+        id: 'location-123',
+        businessId: 'business-123',
+        name: 'Main Warehouse',
+      });
+
+      mockPrisma.productStock.count.mockResolvedValue(1);
+      mockPrisma.stockMovement.count.mockResolvedValue(0);
+
+      await expect(
+        service.deleteStockLocation('business-123', 'location-123'),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockPrisma.stockLocation.delete).not.toHaveBeenCalled();
     });
   });
 });

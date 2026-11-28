@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -18,11 +17,14 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roles       Role[]
-  memberships BusinessMembership[]
-  customers  Customer[]
-  categories Category[]
-  products   Product[]
+  roles          Role[]
+  memberships    BusinessMembership[]
+  customers      Customer[]
+  categories     Category[]
+  products       Product[]
+  stockLocations StockLocation[]
+  productStocks  ProductStock[]
+  stockMovements StockMovement[]
 
   @@map("businesses")
 }
@@ -103,14 +105,14 @@ model RolePermission {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid())
   businessId String
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
 
@@ -152,9 +154,81 @@ model Product {
   business Business  @relation(fields: [businessId], references: [id], onDelete: Restrict)
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  stocks         ProductStock[]
+  stockMovements StockMovement[]
+
   @@unique([businessId, sku])
+  @@unique([businessId, id])
   @@index([businessId])
   @@index([businessId, categoryId])
   @@index([businessId, name])
   @@map("products")
+}
+
+enum StockMovementType {
+  RECEIPT
+  ISSUE
+  ADJUSTMENT
+  TRANSFER
+}
+
+model StockLocation {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business      Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  productStocks ProductStock[]
+  movementsFrom StockMovement[] @relation("MovementFromLocation")
+  movementsTo   StockMovement[] @relation("MovementToLocation")
+
+  @@unique([businessId, id])
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("stock_locations")
+}
+
+model ProductStock {
+  id         String   @id @default(cuid())
+  businessId String
+  productId  String
+  locationId String
+  quantity   Decimal  @default(0) @db.Decimal(14, 3)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product  Product       @relation(fields: [businessId, productId], references: [businessId, id], onDelete: Restrict)
+  location StockLocation @relation(fields: [businessId, locationId], references: [businessId, id], onDelete: Restrict)
+  business Business      @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, productId, locationId])
+  @@index([businessId, locationId])
+  @@map("product_stocks")
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  businessId     String
+  productId      String
+  type           StockMovementType
+  quantity       Decimal           @db.Decimal(14, 3)
+  fromLocationId String?
+  toLocationId   String?
+  reference      String?
+  note           String?
+  createdAt      DateTime          @default(now())
+
+  business     Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  product      Product        @relation(fields: [businessId, productId], references: [businessId, id], onDelete: Restrict)
+  fromLocation StockLocation? @relation("MovementFromLocation", fields: [businessId, fromLocationId], references: [businessId, id], onDelete: Restrict)
+  toLocation   StockLocation? @relation("MovementToLocation", fields: [businessId, toLocationId], references: [businessId, id], onDelete: Restrict)
+
+  @@index([businessId, productId, createdAt])
+  @@index([businessId, fromLocationId])
+  @@index([businessId, toLocationId])
+  @@map("stock_movements")
 }

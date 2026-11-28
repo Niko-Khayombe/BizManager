@@ -1,3 +1,5 @@
+import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
+import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
@@ -310,6 +312,69 @@ deleteCategory(
     return this.businessService.removeMember(
       businessId,
       membershipId,
+    );
+  }
+  
+    @Post(':businessId/stock-locations')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.locations.create')
+  createStockLocation(
+    @Param('businessId') businessId: string,
+    @Body() dto: CreateStockLocationDto,
+  ) {
+    return this.businessService.createStockLocation(
+      businessId,
+      dto,
+    );
+  }
+
+  @Get(':businessId/stock-locations')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.locations.read')
+  findStockLocations(
+    @Param('businessId') businessId: string,
+  ) {
+    return this.businessService.findStockLocations(businessId);
+  }
+
+  @Get(':businessId/stock-locations/:locationId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.locations.read')
+  findStockLocation(
+    @Param('businessId') businessId: string,
+    @Param('locationId') locationId: string,
+  ) {
+    return this.businessService.findStockLocation(
+      businessId,
+      locationId,
+    );
+  }
+
+  @Patch(':businessId/stock-locations/:locationId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.locations.update')
+  updateStockLocation(
+    @Param('businessId') businessId: string,
+    @Param('locationId') locationId: string,
+    @Body() dto: UpdateStockLocationDto,
+  ) {
+    return this.businessService.updateStockLocation(
+      businessId,
+      locationId,
+      dto,
+    );
+  }
+
+  @Delete(':businessId/stock-locations/:locationId')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.locations.delete')
+  deleteStockLocation(
+    @Param('businessId') businessId: string,
+    @Param('locationId') locationId: string,
+  ) {
+    return this.businessService.deleteStockLocation(
+      businessId,
+      locationId,
     );
   }
 
