@@ -1,5 +1,8 @@
 import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
+import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
+import { CreateStockIssueDto } from './dto/create-stock-issue.dto.js';
+import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
@@ -376,6 +379,36 @@ deleteCategory(
       businessId,
       locationId,
     );
+  }
+
+  @Post(':businessId/stock/receipts')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.stock.adjust')
+  receiveStock(
+  @Param('businessId') businessId: string,
+  @Body() dto: CreateStockReceiptDto,
+  ) {
+    return this.businessService.receiveStock(businessId, dto);
+  }
+
+  @Post(':businessId/stock/issues')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.stock.adjust')
+  issueStock(
+  @Param('businessId') businessId: string,
+  @Body() dto: CreateStockIssueDto,
+  ) {
+    return this.businessService.issueStock(businessId, dto);
+  }
+
+  @Post(':businessId/stock/adjustments')
+  @UseGuards(BusinessMembershipGuard, PermissionsGuard)
+  @RequirePermissions('inventory.stock.adjust')
+  adjustStock(
+  @Param('businessId') businessId: string,
+  @Body() dto: CreateStockAdjustmentDto,
+  ) {
+    return this.businessService.adjustStock(businessId, dto);
   }
 
   @Get(':businessId')

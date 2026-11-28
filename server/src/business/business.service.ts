@@ -1,5 +1,8 @@
 import { CreateStockLocationDto } from './dto/create-stock-location.dto.js';
 import { UpdateStockLocationDto } from './dto/update-stock-location.dto.js';
+import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto.js';
+import { CreateStockIssueDto } from './dto/create-stock-issue.dto.js';
+import { CreateStockAdjustmentDto } from './dto/create-stock-adjustment.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
@@ -1330,6 +1333,280 @@ async deleteStockLocation(
   return {
     message: 'Stock location deleted successfully.',
   };
+}
+
+async receiveStock(
+  businessId: string,
+  dto: CreateStockReceiptDto,
+) {
+  return this.prisma.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: {
+        id: dto.productId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        'Active product not found in this business.',
+      );
+    }
+
+    const location = await tx.stockLocation.findFirst({
+      where: {
+        id: dto.locationId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!location) {
+      throw new NotFoundException(
+        'Active stock location not found in this business.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(dto.quantity);
+
+    const stock = await tx.productStock.upsert({
+      where: {
+        businessId_productId_locationId: {
+          businessId,
+          productId: dto.productId,
+          locationId: dto.locationId,
+        },
+      },
+      create: {
+        businessId,
+        productId: dto.productId,
+        locationId: dto.locationId,
+        quantity,
+      },
+      update: {
+        quantity: {
+          increment: quantity,
+        },
+      },
+    });
+
+    const movement = await tx.stockMovement.create({
+      data: {
+        businessId,
+        productId: dto.productId,
+        type: 'RECEIPT',
+        quantity,
+        toLocationId: dto.locationId,
+        reference: dto.reference?.trim() || null,
+        note: dto.note?.trim() || null,
+      },
+    });
+
+    return {
+      message: 'Stock received successfully.',
+      stock,
+      movement,
+    };
+  });
+}
+
+async issueStock(
+  businessId: string,
+  dto: CreateStockIssueDto,
+) {
+  return this.prisma.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: {
+        id: dto.productId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        'Active product not found in this business.',
+      );
+    }
+
+    const location = await tx.stockLocation.findFirst({
+      where: {
+        id: dto.locationId,
+        businessId,
+        isActive: true,
+      },
+    });
+
+    if (!location) {
+      throw new NotFoundException(
+        'Active stock location not found in this business.',
+      );
+    }
+
+    const quantity = new Prisma.Decimal(dto.quantity);
+
+    const result = await tx.productStock.updateMany({
+      where: {
+        businessId,
+        productId: dto.productId,
+        locationId: dto.locationId,
+        quantity: {
+          gte: quantity,
+        },
+      },
+      data: {
+        quantity: {
+          decrement: quantity,
+        },
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Insufficient stock. The requested quantity is not available.',
+      );
+    }
+
+    const stock = await tx.productStock.findUnique({
+      where: {
+        businessId_productId_locationId: {
+          businessId,
+          productId: dto.productId,
+          locationId: dto.locationId,
+        },
+      },
+    });
+
+    const movement = await tx.stockMovement.create({
+      data: {
+        businessId,
+        productId: dto.productId,
+        type: 'ISSUE',
+        quantity,
+        fromLocationId: dto.locationId,
+        reference: dto.reference?.trim() || null,
+        note: dto.note?.trim() || null,
+      },
+    });
+
+    return {
+      message: 'Stock issued successfully.',
+      stock,
+      movement,
+    };
+  });
+}
+
+async adjustStock(
+  businessId: string,
+  dto: CreateStockAdjustmentDto,
+) {
+  try {
+    return await this.prisma.$transaction(
+      async (tx) => {
+        const product = await tx.product.findFirst({
+          where: {
+            id: dto.productId,
+            businessId,
+            isActive: true,
+          },
+        });
+
+        if (!product) {
+          throw new NotFoundException(
+            'Active product not found in this business.',
+          );
+        }
+
+        const location = await tx.stockLocation.findFirst({
+          where: {
+            id: dto.locationId,
+            businessId,
+            isActive: true,
+          },
+        });
+
+        if (!location) {
+          throw new NotFoundException(
+            'Active stock location not found in this business.',
+          );
+        }
+
+        const existingStock = await tx.productStock.findUnique({
+          where: {
+            businessId_productId_locationId: {
+              businessId,
+              productId: dto.productId,
+              locationId: dto.locationId,
+            },
+          },
+        });
+
+        const currentQuantity =
+          existingStock?.quantity ?? new Prisma.Decimal(0);
+
+        const newQuantity = new Prisma.Decimal(dto.newQuantity);
+
+        const difference = newQuantity.minus(currentQuantity);
+
+        const stock = await tx.productStock.upsert({
+          where: {
+            businessId_productId_locationId: {
+              businessId,
+              productId: dto.productId,
+              locationId: dto.locationId,
+            },
+          },
+          create: {
+            businessId,
+            productId: dto.productId,
+            locationId: dto.locationId,
+            quantity: newQuantity,
+          },
+          update: {
+            quantity: newQuantity,
+          },
+        });
+
+        const movement = await tx.stockMovement.create({
+          data: {
+            businessId,
+            productId: dto.productId,
+            type: 'ADJUSTMENT',
+            quantity: difference,
+            fromLocationId: dto.locationId,
+            toLocationId: dto.locationId,
+            reference: dto.reference?.trim() || null,
+            note: dto.note?.trim() || null,
+          },
+        });
+
+        return {
+          message: 'Stock adjusted successfully.',
+          previousQuantity: currentQuantity,
+          newQuantity,
+          difference,
+          stock,
+          movement,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2034'
+    ) {
+      throw new ConflictException(
+        'A concurrent stock adjustment occurred. Please retry.',
+      );
+    }
+
+    throw error;
+  }
 }
 
 async findOne(businessId: string) {

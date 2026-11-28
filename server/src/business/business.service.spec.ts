@@ -2062,4 +2062,216 @@ for (const role of fakeRoles) {
       expect(mockPrisma.stockLocation.delete).not.toHaveBeenCalled();
     });
   });
+
+    describe('stock transaction management', () => {
+    const createTransaction = () => ({
+      product: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'product-123',
+          businessId: 'business-123',
+          isActive: true,
+        }),
+      },
+      stockLocation: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'location-123',
+          businessId: 'business-123',
+          isActive: true,
+        }),
+      },
+      productStock: {
+        upsert: vi.fn().mockResolvedValue({
+          id: 'stock-123',
+          quantity: new Prisma.Decimal(10),
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'stock-123',
+          quantity: new Prisma.Decimal(5),
+        }),
+      },
+      stockMovement: {
+        create: vi.fn().mockResolvedValue({
+          id: 'movement-123',
+          type: 'RECEIPT',
+        }),
+      },
+    });
+
+    it('should receive stock and record a movement', async () => {
+      const tx = createTransaction();
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.receiveStock('business-123', {
+        productId: 'product-123',
+        locationId: 'location-123',
+        quantity: 10,
+        reference: 'PUR-001',
+        note: 'Initial stock',
+      });
+
+      expect(tx.productStock.upsert).toHaveBeenCalled();
+      expect(tx.stockMovement.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          businessId: 'business-123',
+          productId: 'product-123',
+          type: 'RECEIPT',
+          quantity: new Prisma.Decimal(10),
+          toLocationId: 'location-123',
+          reference: 'PUR-001',
+          note: 'Initial stock',
+        }),
+      });
+
+      expect(result.message).toBe('Stock received successfully.');
+    });
+
+    it('should reject receipt when the product does not exist', async () => {
+      const tx = createTransaction();
+      tx.product.findFirst.mockResolvedValue(null);
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.receiveStock('business-123', {
+          productId: 'missing-product',
+          locationId: 'location-123',
+          quantity: 10,
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(tx.productStock.upsert).not.toHaveBeenCalled();
+      expect(tx.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+        it('should issue stock and record a movement', async () => {
+      const tx = createTransaction();
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.issueStock('business-123', {
+        productId: 'product-123',
+        locationId: 'location-123',
+        quantity: 5,
+        reference: 'SALE-001',
+        note: 'Customer purchase',
+      });
+
+      expect(tx.productStock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            businessId: 'business-123',
+            productId: 'product-123',
+            locationId: 'location-123',
+            quantity: {
+              gte: new Prisma.Decimal(5),
+            },
+          }),
+        }),
+      );
+
+      expect(tx.stockMovement.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          businessId: 'business-123',
+          productId: 'product-123',
+          type: 'ISSUE',
+          quantity: new Prisma.Decimal(5),
+          fromLocationId: 'location-123',
+          reference: 'SALE-001',
+          note: 'Customer purchase',
+        }),
+      });
+
+      expect(result).toBeDefined();
+    });
+
+    it('should reject issuing more stock than available', async () => {
+      const tx = createTransaction();
+      tx.productStock.updateMany.mockResolvedValue({ count: 0 });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      await expect(
+        service.issueStock('business-123', {
+          productId: 'product-123',
+          locationId: 'location-123',
+          quantity: 50,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tx.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+        it('should adjust stock and record the quantity difference', async () => {
+      const tx = createTransaction();
+
+      tx.productStock.findUnique.mockResolvedValue({
+        id: 'stock-123',
+        quantity: new Prisma.Decimal(10),
+      });
+
+      mockPrisma.$transaction.mockImplementation(
+        (callback) => callback(tx),
+      );
+
+      const result = await service.adjustStock('business-123', {
+        productId: 'product-123',
+        locationId: 'location-123',
+        newQuantity: 7,
+        reference: 'COUNT-001',
+        note: 'Physical stock count',
+      });
+
+      expect(tx.productStock.upsert).toHaveBeenCalled();
+
+      expect(tx.stockMovement.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          businessId: 'business-123',
+          productId: 'product-123',
+          type: 'ADJUSTMENT',
+          quantity: new Prisma.Decimal(-3),
+          fromLocationId: 'location-123',
+          toLocationId: 'location-123',
+          reference: 'COUNT-001',
+          note: 'Physical stock count',
+        }),
+      });
+
+      expect(result.previousQuantity).toEqual(
+        new Prisma.Decimal(10),
+      );
+      expect(result.newQuantity).toEqual(
+        new Prisma.Decimal(7),
+      );
+    });
+
+        it('should convert transaction conflicts into ConflictException', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError(
+        'Transaction failed due to a write conflict',
+        {
+          code: 'P2034',
+          clientVersion: '6.19.3',
+        },
+      );
+
+      mockPrisma.$transaction.mockRejectedValue(error);
+
+      await expect(
+        service.adjustStock('business-123', {
+          productId: 'product-123',
+          locationId: 'location-123',
+          newQuantity: 10,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
 });

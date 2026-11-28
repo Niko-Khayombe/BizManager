@@ -43,6 +43,9 @@ describe('BusinessController', () => {
     findStockLocation: vi.fn(),
     updateStockLocation: vi.fn(),
     deleteStockLocation: vi.fn(),
+    receiveStock: vi.fn(),
+    issueStock: vi.fn(),
+    adjustStock: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -1043,6 +1046,97 @@ describe('deleteCategory', () => {
           BusinessController.prototype.deleteStockLocation,
         ),
       ).toEqual(['inventory.locations.delete']);
+    });
+  });
+
+    describe('stock transaction endpoints', () => {
+    it('should receive stock', async () => {
+      const dto = {
+        productId: 'product-123',
+        locationId: 'location-123',
+        quantity: 10,
+      };
+
+      const fakeResult = {
+        message: 'Stock received successfully.',
+      };
+
+      mockBusinessService.receiveStock.mockResolvedValue(fakeResult);
+
+      const result = await controller.receiveStock('business-123', dto);
+
+      expect(mockBusinessService.receiveStock).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should issue stock', async () => {
+      const dto = {
+        productId: 'product-123',
+        locationId: 'location-123',
+        quantity: 5,
+      };
+
+      const fakeResult = {
+        message: 'Stock issued successfully.',
+      };
+
+      mockBusinessService.issueStock.mockResolvedValue(fakeResult);
+
+      const result = await controller.issueStock('business-123', dto);
+
+      expect(mockBusinessService.issueStock).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should adjust stock', async () => {
+      const dto = {
+        productId: 'product-123',
+        locationId: 'location-123',
+        newQuantity: 15,
+      };
+
+      const fakeResult = {
+        message: 'Stock adjusted successfully.',
+      };
+
+      mockBusinessService.adjustStock.mockResolvedValue(fakeResult);
+
+      const result = await controller.adjustStock('business-123', dto);
+
+      expect(mockBusinessService.adjustStock).toHaveBeenCalledWith(
+        'business-123',
+        dto,
+      );
+      expect(result).toEqual(fakeResult);
+    });
+
+    it('should require the inventory.stock.adjust permission', () => {
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.receiveStock,
+        ),
+      ).toEqual(['inventory.stock.adjust']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.issueStock,
+        ),
+      ).toEqual(['inventory.stock.adjust']);
+
+      expect(
+        Reflect.getMetadata(
+          PERMISSIONS_KEY,
+          BusinessController.prototype.adjustStock,
+        ),
+      ).toEqual(['inventory.stock.adjust']);
     });
   });
 });
